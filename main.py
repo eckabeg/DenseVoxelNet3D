@@ -4,6 +4,7 @@ import tensorflow as tf
 from tensorflow import keras
 from keras import layers, models
 import config as CONFIG
+from model_builder import ModelBuilder
 
 
 def create_dense_voxel_tensor(voxels, voxel_size, bounding_box):
@@ -91,7 +92,7 @@ target_shape = (64, 64, 64)
 # Convert voxels to dense tensor and pad
 input_tensor = convert_voxels_to_dense_tensor(all_action_voxels)
 input_tensor = tf.convert_to_tensor(input_tensor, dtype=tf.float32)
-input_tensor = tf.transpose(input_tensor, perm=(0, 2, 3, 4, 1))
+#input_tensor = tf.transpose(input_tensor, perm=(0, 2, 3, 4, 1))
 labels = np.concat([
     np.repeat(0, 18), np.repeat(1, 35),
 
@@ -120,28 +121,6 @@ labels = np.concat([
 labels = tf.convert_to_tensor(labels, dtype=tf.int32)
 classes = ('running', 'standing', 'walking', 'running backwards', "turning")
 
-# AlexNET model
-model = models.Sequential()
-model.add(layers.Input((64, 64, 64, 2)))
-model.add(layers.Conv3D(96, (7, 7, 7), (2, 2, 2), activation='relu'))  # Input: 3D grid
-model.add(layers.MaxPooling3D((3, 3, 3), (2, 2, 2)))
-
-model.add(layers.Conv3D(256, (5, 5, 5), padding="same", activation='relu'))
-model.add(layers.MaxPooling3D((3, 3, 3), (2, 2, 2)))
-
-model.add(layers.Conv3D(384, (3, 3, 3), padding="same", activation='relu'))
-model.add(layers.Conv3D(384, (3, 3, 3), padding="same", activation='relu'))
-model.add(layers.Conv3D(256, (3, 3, 3), padding="same", activation='relu'))
-model.add(layers.MaxPooling3D((3, 3, 3), (2, 2, 2), padding="same"))
-
-model.add(layers.Flatten())
-model.add(layers.Dense(4096, activation='relu'))
-model.add(layers.Dropout(0.5))
-model.add(layers.Dense(4096, activation='relu'))
-model.add(layers.Dropout(0.5))
-model.add(layers.Dense(len(classes), activation='softmax'))
-model.summary()
-
 
 """
 model = models.Sequential()
@@ -157,6 +136,8 @@ model.add(layers.Flatten())
 model.add(layers.Dense(64, activation='relu'))
 model.add(layers.Dense(len(classes), activation='softmax'))  # Output layer for classification
 """
+model = ModelBuilder.AlexNet(classes)
+model.summary()
 model.compile(optimizer='adam', loss=tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True), metrics=['accuracy'])
 
 history = model.fit(input_tensor, labels, epochs=CONFIG.EPOCHS)
@@ -177,7 +158,6 @@ predict_action_voxels = [
 ]
 predict_tensor = convert_voxels_to_dense_tensor(predict_action_voxels)
 predict_tensor = tf.convert_to_tensor(predict_tensor, dtype=tf.float32)
-predict_tensor = tf.transpose(predict_tensor, perm=(0, 2, 3, 4, 1))
 predict_tensor = np.expand_dims(predict_tensor, axis=-1)
 test_model = keras.models.load_model("models/direct_regression.keras")
 predicted_labels = test_model(predict_tensor, training=False)

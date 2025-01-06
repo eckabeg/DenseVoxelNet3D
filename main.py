@@ -87,13 +87,13 @@ all_action_voxels = [
 
 # Define a bounding box (e.g., 10x10x10 units) and target shape
 bounding_box = (10, 10, 10)
-target_shape = (64, 64, 64)
+target_shape = CONFIG.INPUT_SHAPE
 
 # Convert voxels to dense tensor and pad
 input_tensor = convert_voxels_to_dense_tensor(all_action_voxels)
 input_tensor = tf.convert_to_tensor(input_tensor, dtype=tf.float32)
 #input_tensor = tf.transpose(input_tensor, perm=(0, 2, 3, 4, 1))
-labels = np.concat([
+labels = np.concatenate([
     np.repeat(0, 18), np.repeat(1, 35),
 
     np.repeat(0, 16),
@@ -136,7 +136,7 @@ model.add(layers.Flatten())
 model.add(layers.Dense(64, activation='relu'))
 model.add(layers.Dense(len(classes), activation='softmax'))  # Output layer for classification
 """
-model = ModelBuilder.AlexNet(classes)
+model = ModelBuilder.AlexNet(len(classes), CONFIG.INPUT_SHAPE, CONFIG.FRAME_GROUPING)
 model.summary()
 model.compile(optimizer='adam', loss=tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True), metrics=['accuracy'])
 
@@ -165,7 +165,7 @@ predicted_labels = test_model(predict_tensor, training=False)
 # Assuming test_result is the output from your model
 predicted_labels = tf.argmax(predicted_labels, axis=-1).numpy()
 # If you have true labels for the test data
-true_labels = np.concat([
+true_labels = np.concatenate([
     np.repeat(0, 18), np.repeat(1, 35),
 
     #np.repeat(0, 16),
@@ -195,7 +195,7 @@ def PointCloudClassifier():
     dataLoader = BinaryDataLoader(0.05, 600)
     pcds = dataLoader.load_pcd("C:/Users/lagro/source/repos/Uni/LidarSensorProject/data/LIPD/PC_Data/train/ACCAD/Female1Running_c3d/C2_-_Run_to_stand_stageii")
     input_tensor = tf.convert_to_tensor(pcds, dtype=tf.float32)
-    labels = tf.convert_to_tensor(np.concat([np.repeat(0, 18), np.repeat(1, 35)]), dtype=tf.int32)
+    labels = tf.convert_to_tensor(np.concatenate([np.repeat(0, 18), np.repeat(1, 35)]), dtype=tf.int32)
 
     model = models.Sequential()
     model.add(layers.Conv1D(64, 1, activation='relu', input_shape=(500, 3)))

@@ -1,4 +1,5 @@
 from keras import layers, models
+import config as CONFIG
 
 class ModelBuilder:
     
@@ -20,9 +21,9 @@ class ModelBuilder:
 
         model.add(layers.Flatten())
         model.add(layers.Dense(4096, activation='relu'))
-        model.add(layers.Dropout(0.5))
+        model.add(layers.Dropout(CONFIG.DROPOUT))
         model.add(layers.Dense(4096, activation='relu'))
-        model.add(layers.Dropout(0.5))
+        model.add(layers.Dropout(CONFIG.DROPOUT))
         model.add(layers.Dense(num_classes, activation='softmax'))
         return model
 
@@ -41,6 +42,8 @@ class ModelBuilder:
         model.add(layers.Conv3D(256, (1, 3, 3), activation='relu', padding="same"))
         model.add(layers.Flatten())
         model.add(layers.Dense(512, activation='relu'))
+        model.add(layers.Dropout(CONFIG.DROPOUT))
         model.add(layers.Dense(256, activation='relu'))
+        model.add(layers.Dropout(CONFIG.DROPOUT))
         model.add(layers.Dense(num_classes, activation='softmax'))
         return model

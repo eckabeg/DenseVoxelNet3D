@@ -138,7 +138,8 @@ model.add(layers.Dense(len(classes), activation='softmax'))  # Output layer for 
 """
 model = ModelBuilder.AlexNet(len(classes), CONFIG.INPUT_SHAPE, CONFIG.FRAME_GROUPING)
 model.summary()
-model.compile(optimizer='adam', loss=tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True), metrics=['accuracy'])
+optimizer = tf.keras.optimizers.Adam(learning_rate=CONFIG.LEARNING_RATE)
+model.compile(optimizer=optimizer, loss=tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True), metrics=['accuracy'])
 
 history = model.fit(input_tensor, labels, epochs=CONFIG.EPOCHS)
 model.save("models/direct_regression.keras")
@@ -146,7 +147,7 @@ model.save("models/direct_regression.keras")
 
 predict_action_voxels = [
     # already seen data
-    dataLoader.load_voxels("data/LIPD/PC_Data/train/ACCAD/Female1Running_c3d/C2_-_Run_to_stand_stageii"),
+    #dataLoader.load_voxels("data/LIPD/PC_Data/train/ACCAD/Female1Running_c3d/C2_-_Run_to_stand_stageii"),
     #dataLoader.load_voxels("data/LIPD/PC_Data/train/ACCAD/Female1Running_c3d/C3_-_Run_stageii"),
     #dataLoader.load_voxels("data/LIPD/PC_Data/train/ACCAD/Female1Running_c3d/C4_-_Run_to_walk1_stageii"),
     #dataLoader.load_voxels("data/LIPD/PC_Data/train/ACCAD/Female1Running_c3d/C5_-_walk_to_run_stageii"),
@@ -166,7 +167,7 @@ predicted_labels = test_model(predict_tensor, training=False)
 predicted_labels = tf.argmax(predicted_labels, axis=-1).numpy()
 # If you have true labels for the test data
 true_labels = np.concatenate([
-    np.repeat(0, 18), np.repeat(1, 35),
+    #np.repeat(0, 18), np.repeat(1, 35),
 
     #np.repeat(0, 16),
 

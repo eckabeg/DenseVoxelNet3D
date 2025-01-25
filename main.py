@@ -5,6 +5,7 @@ from tensorflow import keras
 from keras import layers, models
 import config as CONFIG
 from model_builder import ModelBuilder
+from tensorflow_dataloader import TensorFlowDataLoader
 
 
 def create_dense_voxel_tensor(voxels, voxel_size, bounding_box):
@@ -69,76 +70,79 @@ def convert_voxels_to_dense_tensor(all_action_voxels, labels):
     
     return all_labels, input_tensor
 
-dataLoader = PickleDataLoader()
-print("Started loading data")
-labels, all_action_voxels = dataLoader.load(CONFIG.TRAINING_DATA_PATH)
-print("Finished loading data")
+print('Start create train_data_loader')
+train_data_loader = TensorFlowDataLoader(
+    file_paths=[CONFIG.TRAINING_DATA_PATH],
+    bounding_box=(10, 10, 10),
+    target_shape=CONFIG.INPUT_SHAPE,
+    voxel_size=CONFIG.VOXEL_SIZE,
+    frame_grouping=CONFIG.FRAME_GROUPING,
+)
+print('End create train_data_loader')
 
-labels_to_id = {label: idx for idx, label in enumerate(sorted(set(labels)))}
-reverse_labels = {idx: label for label, idx in labels_to_id.items()}
+print('Start create train_dataset')
+train_dataset = train_data_loader.get_tf_dataset()
+print('End create train_dataset')
 
-labels = [labels_to_id[label] for label in labels]
+def preprocess_dataset(voxel, label):
+    # Add a channel dimension to the voxel grid
+    voxel = tf.expand_dims(voxel, axis=-1)  # Shape becomes (..., 1)
+    return voxel, label
 
+# Apply preprocessing
+print('Start preprocess train_dataset')
+#train_dataset = train_dataset.map(preprocess_dataset, num_parallel_calls=tf.data.AUTOTUNE)
+train_prepared_dataset = train_dataset.shuffle(100).batch(32).prefetch(tf.data.AUTOTUNE)
+print('End preprocess train_dataset')
 
-# Define a bounding box (e.g., 10x10x10 units) and target shape
-bounding_box = (10, 10, 10)
-target_shape = CONFIG.INPUT_SHAPE
+def get_classes_from_files(file_paths, data_loader):
+    unique_classes = set()
+    for file_path in file_paths:
+        labels, _ = data_loader.load_data(file_path)
+        unique_classes.update(labels)
+    return sorted(unique_classes), len(unique_classes)
 
-# Convert voxels to dense tensor and pad
-print("Started converting data")
-labels, input_tensor = convert_voxels_to_dense_tensor(all_action_voxels, labels)
-print("Finished converting data")
-input_tensor = tf.convert_to_tensor(input_tensor, dtype=tf.float32)
-print('Input_tensor:', input_tensor.shape)
+# Example usage
+print('Start unique_classes')
+unique_classes, num_classes = get_classes_from_files([CONFIG.TRAINING_DATA_PATH], train_data_loader)
+print('End unique_classes')
 #input_tensor = tf.transpose(input_tensor, perm=(0, 2, 3, 4, 1))
-labels = tf.convert_to_tensor(labels, dtype=tf.int32)
 
-model = ModelBuilder.AlexNet(len(labels_to_id.keys()), CONFIG.INPUT_SHAPE, CONFIG.FRAME_GROUPING)
+model = ModelBuilder.AlexNet((num_classes), CONFIG.INPUT_SHAPE, CONFIG.FRAME_GROUPING)
 model.summary()
 optimizer = tf.keras.optimizers.Adam(learning_rate=CONFIG.LEARNING_RATE)
 model.compile(optimizer=optimizer, loss=tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True), metrics=['accuracy'])
 
-history = model.fit(input_tensor, labels, epochs=CONFIG.EPOCHS)
+history = model.fit(train_prepared_dataset, epochs=CONFIG.EPOCHS)
 model.save("models/direct_regression.keras")
 
 
-predict_action_voxels = [
-    # already seen data
-    #dataLoader.load_voxels("data/LIPD/PC_Data/train/ACCAD/Female1Running_c3d/C2_-_Run_to_stand_stageii"),
-    #dataLoader.load_voxels("data/LIPD/PC_Data/train/ACCAD/Female1Running_c3d/C3_-_Run_stageii"),
-    #dataLoader.load_voxels("data/LIPD/PC_Data/train/ACCAD/Female1Running_c3d/C4_-_Run_to_walk1_stageii"),
-    #dataLoader.load_voxels("data/LIPD/PC_Data/train/ACCAD/Female1Running_c3d/C5_-_walk_to_run_stageii"),
+test_data_loader = TensorFlowDataLoader(
+    file_paths=[CONFIG.TEST_DATA_PATH],
+    bounding_box=(10, 10, 10),
+    target_shape=CONFIG.INPUT_SHAPE,
+    voxel_size=CONFIG.VOXEL_SIZE,
+    frame_grouping=CONFIG.FRAME_GROUPING,
+)
 
-    # new data
-    dataLoader.load_voxels("data/LIPD/PC_Data/train/ACCAD/Female1Running_c3d/C15_-__run_turn_right__(45)_stageii"),
-    dataLoader.load_voxels("data/LIPD/PC_Data/train/ACCAD/Female1Running_c3d/C16_-__run_turn_right__(135)_stageii"),
-    dataLoader.load_voxels("data/LIPD/PC_Data/train/ACCAD/Female1Running_c3d/C19_-__run_to_hop_to_walk_stageii"),
-]
-predict_tensor = convert_voxels_to_dense_tensor(predict_action_voxels)
-predict_tensor = tf.convert_to_tensor(predict_tensor, dtype=tf.float32)
-predict_tensor = np.expand_dims(predict_tensor, axis=-1)
+test_dataset = test_data_loader.get_tf_dataset()
+
+# Apply preprocessing
+test_prepared_dataset = test_dataset.shuffle(100).batch(32).prefetch(tf.data.AUTOTUNE)
+
 test_model = keras.models.load_model("models/direct_regression.keras")
-predicted_labels = test_model(predict_tensor, training=False)
+predicted_labels = test_model(test_prepared_dataset, training=False)
 
 # Assuming test_result is the output from your model
 predicted_labels = tf.argmax(predicted_labels, axis=-1).numpy()
-# If you have true labels for the test data
-true_labels = np.concatenate([
-    #np.repeat(0, 18), np.repeat(1, 35),
 
-    #np.repeat(0, 16),
+def extract_labels(dataset):
+    labels = []
+    for _, label in dataset:
+        labels.append(label.numpy())  # Convert from Tensor to NumPy
+    return labels
 
-    #np.repeat(0, 15), np.repeat(2, 20),
-
-    #np.repeat(2, 41), np.repeat(0, 13),
-
-
-    np.repeat(0, 21),
-
-    np.repeat(0, 23),
-
-    np.repeat(0, 28), np.repeat(2, 14),
-])
+true_labels = extract_labels(test_prepared_dataset)
 
 # Calculate accuracy
 accuracy = np.mean(predicted_labels == true_labels)
@@ -146,29 +150,3 @@ print(f"Accuracy: {accuracy * 100:.2f}%")
 
 # Print predicted labels
 print("Predicted Labels:", predicted_labels)
-
-
-
-def PointCloudClassifier():
-    dataLoader = BinaryDataLoader(0.05, 600)
-    pcds = dataLoader.load_pcd("C:/Users/lagro/source/repos/Uni/LidarSensorProject/data/LIPD/PC_Data/train/ACCAD/Female1Running_c3d/C2_-_Run_to_stand_stageii")
-    input_tensor = tf.convert_to_tensor(pcds, dtype=tf.float32)
-    labels = tf.convert_to_tensor(np.concatenate([np.repeat(0, 18), np.repeat(1, 35)]), dtype=tf.int32)
-
-    model = models.Sequential()
-    model.add(layers.Conv1D(64, 1, activation='relu', input_shape=(500, 3)))
-    model.add(layers.Conv1D(128, 1, activation='relu'))
-    model.add(layers.Conv1D(1024, 1, activation='relu'))
-    model.add(layers.GlobalMaxPooling1D())
-
-    model.add(layers.Dense(512, activation='relu'))
-    model.add(layers.Dense(256, activation='relu'))
-    model.add(layers.Dense(2, activation='softmax'))
-
-    model.summary()
-
-    model.compile(optimizer='adam',
-                loss=tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True),
-                metrics=['accuracy'])
-
-    history = model.fit(input_tensor, labels, epochs=10)

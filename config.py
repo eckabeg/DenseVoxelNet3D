@@ -13,6 +13,7 @@ FRAME_GROUPING      = 2
 
 
 LEARNING_RATE       = 0.001
+BATCH_SIZE          = 128
 
 TRAINING_DATA_PATH  = 'data/HmPEAR/label/train_act.pkl'
 TEST_DATA_PATH      = 'data/HmPEAR/label/test_act.pkl'

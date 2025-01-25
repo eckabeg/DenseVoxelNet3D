@@ -92,7 +92,7 @@ def preprocess_dataset(voxel, label):
 # Apply preprocessing
 print('Start preprocess train_dataset')
 #train_dataset = train_dataset.map(preprocess_dataset, num_parallel_calls=tf.data.AUTOTUNE)
-train_prepared_dataset = train_dataset.shuffle(100).batch(32).prefetch(tf.data.AUTOTUNE)
+train_prepared_dataset = train_dataset.shuffle(100).batch(CONFIG.BATCH_SIZE).prefetch(tf.data.AUTOTUNE)
 print('End preprocess train_dataset')
 
 def get_classes_from_files(file_paths, data_loader):
@@ -128,7 +128,7 @@ test_data_loader = TensorFlowDataLoader(
 test_dataset = test_data_loader.get_tf_dataset()
 
 # Apply preprocessing
-test_prepared_dataset = test_dataset.shuffle(100).batch(32).prefetch(tf.data.AUTOTUNE)
+test_prepared_dataset = test_dataset.shuffle(100).batch(CONFIG.BATCH_SIZE).prefetch(tf.data.AUTOTUNE)
 
 test_model = keras.models.load_model("models/direct_regression.keras")
 predicted_labels = test_model(test_prepared_dataset, training=False)

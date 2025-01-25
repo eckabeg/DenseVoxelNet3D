@@ -2,6 +2,8 @@ from abc import abstractmethod
 import open3d as o3d
 import numpy as np
 import os
+import pickle
+import config as CONFIG
 
 class DataLoader:
     @abstractmethod
@@ -11,6 +13,27 @@ class DataLoader:
     @abstractmethod
     def load(self, path):
         raise NotImplementedError
+    
+class PickleDataLoader(DataLoader):
+    def voxelize(self, pcd):
+        raise NotImplementedError
+    
+    def load(self, path):
+        with open(path, 'rb') as file:
+            data = pickle.load(file)
+        
+        data = data[:25]
+        labels = [seq['action'] for seq in data]
+        point_cloud_sequences = [seq['human_pc'] for seq in data]
+        all_voxels = []
+        for point_cloud_sequence in point_cloud_sequences:
+            sequence_voxels = []
+            for raw_point_cloud in point_cloud_sequence:
+                pcd = o3d.t.geometry.PointCloud(raw_point_cloud).to_legacy()
+                voxels = o3d.geometry.VoxelGrid.create_from_point_cloud(pcd, voxel_size = CONFIG.VOXEL_SIZE)
+                sequence_voxels.append(voxels.get_voxels())
+            all_voxels.append(sequence_voxels)
+        return labels, all_voxels
 
 class PlyDataLoader(DataLoader):
     voxel_size = 0.05

@@ -12,4 +12,6 @@ FRAME_GROUPING      = 2
 
 
 
-LEARNING_RATE       = 0.01
+LEARNING_RATE       = 0.001
+
+TRAINING_DATA_PATH  = 'data/HmPEAR/label/test_act.pkl'

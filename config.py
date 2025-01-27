@@ -17,3 +17,8 @@ BATCH_SIZE          = 128
 
 TRAINING_DATA_PATH  = 'data/HmPEAR/label/train_act.pkl'
 TEST_DATA_PATH      = 'data/HmPEAR/label/test_act.pkl'
+
+CHECKPOINT_PATH     = "models/checkpoints/direct_regression.model.keras"
+
+INPUT_TENSOR_PATH   = "data/HmPEAR/input_tensor/"
+INPUT_TENSOR_CHUNK_SIZE          = 25

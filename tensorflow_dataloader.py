@@ -2,10 +2,13 @@ import tensorflow as tf
 import numpy as np
 import open3d as o3d
 import pickle
+import os
+import config as CONFIG
 
 class TensorFlowDataLoader:
-    def __init__(self, file_paths, bounding_box, target_shape, voxel_size, frame_grouping=1):
-        self.file_paths = file_paths
+    def __init__(self, name, file_path, bounding_box, target_shape, voxel_size, frame_grouping=1):
+        self.name = name
+        self.file_path = file_path
         self.bounding_box = bounding_box
         self.target_shape = target_shape
         self.voxel_size = voxel_size
@@ -89,25 +92,35 @@ class TensorFlowDataLoader:
                 frame_grouping = []
         
         return all_labels, input_tensor
+    
+    def setup(self):
+        os.makedirs(os.path.dirname(CONFIG.INPUT_TENSOR_PATH), exist_ok=True)
+        labels, all_voxels = self.load_data(self.file_path)
+        chunk_size = max(1, len(all_voxels) // CONFIG.INPUT_TENSOR_CHUNK_SIZE)
+        for index, start in enumerate(range(0, len(all_voxels), chunk_size)):
+            file_path = f'{CONFIG.INPUT_TENSOR_PATH}{index}_{self.name}_{self.frame_grouping}_{self.target_shape}_{self.bounding_box}_{self.voxel_size}.p'
+            if not os.path.isfile(file_path):
+                continue
+
+            end = start + chunk_size
+            chunk_voxels = all_voxels[start:end]
+            chunk_labels = labels[start:end]
+            
+            print("start create input tensor")
+            chunk_input_labels, chunk_input_voxels = self.convert_voxels_to_dense_tensor(chunk_voxels, chunk_labels)
+            print("end create input tensor")
+            with open(file_path, 'wb') as path:
+                pickle.dump((chunk_input_labels, chunk_input_voxels), path)
+
 
     def generator(self):
-        for file_path in self.file_paths:
-            print("start load data")
-            labels, all_voxels = self.load_data(file_path)
-            print("end load data")
-
-            chunk_size = max(1, len(all_voxels) // 100)
-            for start in range(0, len(all_voxels), chunk_size):
-                end = start + chunk_size
-                chunk_voxels = all_voxels[start:end]
-                chunk_labels = labels[start:end]
-
-                print("start create input tensor")
-                chunk_labels, chunk_voxels = self.convert_voxels_to_dense_tensor(chunk_voxels, chunk_labels)
-                print("end create input tensor")
-
-                for index, voxels in enumerate(chunk_voxels):
-                    yield voxels, chunk_labels[index]
+        for index in range(0, CONFIG.INPUT_TENSOR_CHUNK_SIZE):
+            file_path = f'{CONFIG.INPUT_TENSOR_PATH}{index}_{self.name}_{self.frame_grouping}_{self.target_shape}_{self.bounding_box}_{self.voxel_size}.p'
+            with open(file_path, "rb") as file:
+                (chunk_input_labels, chunk_input_voxels) = pickle.load(file)
+            
+            for index, voxels in enumerate(chunk_input_voxels):
+                yield voxels, chunk_input_labels[index]
 
     def get_tf_dataset(self):
         output_signature = (

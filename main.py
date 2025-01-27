@@ -72,13 +72,18 @@ def convert_voxels_to_dense_tensor(all_action_voxels, labels):
 
 print('Start create train_data_loader')
 train_data_loader = TensorFlowDataLoader(
-    file_paths=[CONFIG.TRAINING_DATA_PATH],
+    name='train_dataloader',
+    file_path=CONFIG.TRAINING_DATA_PATH,
     bounding_box=(10, 10, 10),
     target_shape=CONFIG.INPUT_SHAPE,
     voxel_size=CONFIG.VOXEL_SIZE,
     frame_grouping=CONFIG.FRAME_GROUPING,
 )
 print('End create train_data_loader')
+
+print('start setup train_data_loader')
+train_data_loader.setup()
+print('end setup train_data_loader')
 
 print('Start create train_dataset')
 train_dataset = train_data_loader.get_tf_dataset()
@@ -110,15 +115,20 @@ print('End unique_classes')
 
 model = ModelBuilder.AlexNet((num_classes), CONFIG.INPUT_SHAPE, CONFIG.FRAME_GROUPING)
 model.summary()
+model_checkpoint_callback = keras.callbacks.ModelCheckpoint(
+    filepath=CONFIG.CHECKPOINT_PATH,
+    monitor='val_accuracy',
+    mode='max',
+    save_best_only=True)
 optimizer = tf.keras.optimizers.Adam(learning_rate=CONFIG.LEARNING_RATE)
 model.compile(optimizer=optimizer, loss=tf.keras.losses.SparseCategoricalCrossentropy(), metrics=['accuracy'])
-
-history = model.fit(train_prepared_dataset, epochs=CONFIG.EPOCHS)
+history = model.fit(train_prepared_dataset, epochs=CONFIG.EPOCHS, callbacks=[model_checkpoint_callback])
 model.save("models/direct_regression.keras")
 
 
 test_data_loader = TensorFlowDataLoader(
-    file_paths=[CONFIG.TEST_DATA_PATH],
+    name='test_dataloader',
+    file_path=CONFIG.TEST_DATA_PATH,
     bounding_box=(10, 10, 10),
     target_shape=CONFIG.INPUT_SHAPE,
     voxel_size=CONFIG.VOXEL_SIZE,

@@ -38,7 +38,7 @@ class TensorFlowDataLoader:
 
         return labels, all_voxels
 
-    def create_dense_voxel_tensor(voxels, voxel_size, bounding_box):
+    def create_dense_voxel_tensor(self, voxels, voxel_size, bounding_box):
         # Create an empty 3D grid with the bounding box dimensions
         grid_shape = (
             int(np.ceil(bounding_box[0] / voxel_size)),
@@ -53,7 +53,7 @@ class TensorFlowDataLoader:
         
         return dense_grid
 
-    def pad_or_trim_voxel_grid(voxel_grid, target_shape):
+    def pad_or_trim_voxel_grid(self, voxel_grid, target_shape):
         padded_grid = np.zeros(target_shape, dtype=np.float32)
 
         # Find the slicing limits to center the voxel grid
@@ -95,18 +95,29 @@ class TensorFlowDataLoader:
             print("start load data")
             labels, all_voxels = self.load_data(file_path)
             print("end load data")
-            print("start create input tensor")
-            labels, all_voxels = self.convert_voxels_to_dense_tensor(all_voxels, labels)
-            print("end create input tensor")
-            for index, voxels in enumerate(all_voxels):
-                yield voxels, labels[index]
+
+            chunk_size = max(1, len(all_voxels) // 100)
+            for start in range(0, len(all_voxels), chunk_size):
+                end = start + chunk_size
+                chunk_voxels = all_voxels[start:end]
+                chunk_labels = labels[start:end]
+
+                print("start create input tensor")
+                chunk_labels, chunk_voxels = self.convert_voxels_to_dense_tensor(chunk_voxels, chunk_labels)
+                print("end create input tensor")
+
+                for index, voxels in enumerate(chunk_voxels):
+                    yield voxels, chunk_labels[index]
 
     def get_tf_dataset(self):
         output_signature = (
             tf.TensorSpec(shape=(self.frame_grouping, *self.target_shape) if self.frame_grouping > 1 else self.target_shape, dtype=tf.float32),
             tf.TensorSpec(shape=(), dtype=tf.int32),
         )
-        return tf.data.Dataset.from_generator(self.generator, output_signature=output_signature)
+
+        dataset = tf.data.Dataset.from_generator(self.generator, output_signature=output_signature)
+        dataset = dataset.prefetch(buffer_size=tf.data.AUTOTUNE)
+        return dataset
 
     '''
     def create_dense_voxel_tensor(self, voxels):

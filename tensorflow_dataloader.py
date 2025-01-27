@@ -38,6 +38,75 @@ class TensorFlowDataLoader:
 
         return labels, all_voxels
 
+    def create_dense_voxel_tensor(voxels, voxel_size, bounding_box):
+        # Create an empty 3D grid with the bounding box dimensions
+        grid_shape = (
+            int(np.ceil(bounding_box[0] / voxel_size)),
+            int(np.ceil(bounding_box[1] / voxel_size)),
+            int(np.ceil(bounding_box[2] / voxel_size)),
+        )
+        dense_grid = np.zeros(grid_shape, dtype=np.float32)
+
+        for voxel in voxels:
+            x, y, z = voxel.grid_index
+            dense_grid[x, y, z] = 1  # Mark the voxel as occupied
+        
+        return dense_grid
+
+    def pad_or_trim_voxel_grid(voxel_grid, target_shape):
+        padded_grid = np.zeros(target_shape, dtype=np.float32)
+
+        # Find the slicing limits to center the voxel grid
+        min_shape = np.minimum(voxel_grid.shape, target_shape)
+        slices = tuple(slice(0, s) for s in min_shape)
+        padded_slices = tuple(slice(0, s) for s in target_shape)
+
+        padded_grid[padded_slices] = voxel_grid[slices]
+
+        return padded_grid
+
+    def create_padded_voxel_tensor(self, voxels):
+        dense_voxel_grid = self.create_dense_voxel_tensor(voxels, self.voxel_size, self.bounding_box)
+        padded_voxel_grid = self.pad_or_trim_voxel_grid(dense_voxel_grid, self.target_shape)
+        return tf.convert_to_tensor(padded_voxel_grid, dtype=tf.float32)
+    
+    def convert_voxels_to_dense_tensor(self, all_action_voxels, labels):
+        input_tensor = []
+        all_labels = []
+        for actionIndex, action in enumerate(all_action_voxels):
+            frame_grouping = []
+            for i in range(0, len(action)):
+                padded_voxel_tensor = self.create_padded_voxel_tensor(action[i], self.bounding_box, self.target_shape)
+                all_labels.append(labels[actionIndex])
+                if(self.frame_grouping <= 1):
+                    input_tensor.append(padded_voxel_tensor)
+                    continue
+
+                frame_grouping.append(padded_voxel_tensor)
+                for y in range(1, self.frame_grouping):
+                    frame_grouping.append(self.create_padded_voxel_tensor(action[i], self.bounding_box, self.target_shape))
+                input_tensor.append(frame_grouping)
+                frame_grouping = []
+        
+        return all_labels, input_tensor
+
+    def generator(self):
+        for file_path in self.file_paths:
+            print("iterate")
+            labels, all_voxels = self.load_data(file_path)
+            labels, all_voxels = self.convert_voxels_to_dense_tensor(all_voxels, labels)
+
+            for index, voxels in enumerate(all_voxels):
+                yield voxels, labels[index]
+
+    def get_tf_dataset(self):
+        output_signature = (
+            tf.TensorSpec(shape=(self.frame_grouping, *self.target_shape) if self.frame_grouping > 1 else self.target_shape, dtype=tf.float32),
+            tf.TensorSpec(shape=(), dtype=tf.int32),
+        )
+        return tf.data.Dataset.from_generator(self.generator, output_signature=output_signature)
+
+    '''
     def create_dense_voxel_tensor(self, voxels):
         grid_shape = (
             int(np.ceil(self.bounding_box[0] / self.voxel_size)),
@@ -66,15 +135,17 @@ class TensorFlowDataLoader:
     def create_padded_voxel_tensor(self, voxels):
         dense_voxel_grid = self.create_dense_voxel_tensor(voxels)
         return self.pad_or_trim_voxel_grid(dense_voxel_grid)
+    
+    def create_padded_voxel_tensor(voxels, bounding_box, target_shape):
+        dense_voxel_grid = create_dense_voxel_tensor(voxels, CONFIG.VOXEL_SIZE, bounding_box)
+        padded_voxel_grid = pad_or_trim_voxel_grid(dense_voxel_grid, target_shape)
+        return tf.convert_to_tensor(padded_voxel_grid, dtype=tf.float32)
+
 
     def prepare_voxel_tensor(self, voxel_grids):
         return tf.convert_to_tensor(voxel_grids, dtype=tf.float32)
 
-    def generator(self):
-        for file_path in self.file_paths:
-            labels, all_voxels = self.load_data(file_path)
-
-            for action_index, action_voxels in enumerate(all_voxels):
+                    for action_index, action_voxels in enumerate(all_voxels):
                 for i in range(len(action_voxels)):
                     padded_voxel_tensor = self.create_padded_voxel_tensor(action_voxels[i])
 
@@ -84,10 +155,4 @@ class TensorFlowDataLoader:
                         yield frame_group_tensor, labels[action_index]
                     else:
                         yield padded_voxel_tensor, labels[action_index]
-
-    def get_tf_dataset(self):
-        output_signature = (
-            tf.TensorSpec(shape=(self.frame_grouping, *self.target_shape) if self.frame_grouping > 1 else self.target_shape, dtype=tf.float32),
-            tf.TensorSpec(shape=(), dtype=tf.int32),
-        )
-        return tf.data.Dataset.from_generator(self.generator, output_signature=output_signature)
+'''

@@ -76,7 +76,7 @@ class TensorFlowDataLoader:
         for actionIndex, action in enumerate(all_action_voxels):
             frame_grouping = []
             for i in range(0, len(action)):
-                padded_voxel_tensor = self.create_padded_voxel_tensor(action[i], self.bounding_box, self.target_shape)
+                padded_voxel_tensor = self.create_padded_voxel_tensor(action[i])
                 all_labels.append(labels[actionIndex])
                 if(self.frame_grouping <= 1):
                     input_tensor.append(padded_voxel_tensor)
@@ -84,7 +84,7 @@ class TensorFlowDataLoader:
 
                 frame_grouping.append(padded_voxel_tensor)
                 for y in range(1, self.frame_grouping):
-                    frame_grouping.append(self.create_padded_voxel_tensor(action[i], self.bounding_box, self.target_shape))
+                    frame_grouping.append(self.create_padded_voxel_tensor(action[i]))
                 input_tensor.append(frame_grouping)
                 frame_grouping = []
         
@@ -92,10 +92,12 @@ class TensorFlowDataLoader:
 
     def generator(self):
         for file_path in self.file_paths:
-            print("iterate")
+            print("start load data")
             labels, all_voxels = self.load_data(file_path)
+            print("end load data")
+            print("start create input tensor")
             labels, all_voxels = self.convert_voxels_to_dense_tensor(all_voxels, labels)
-
+            print("end create input tensor")
             for index, voxels in enumerate(all_voxels):
                 yield voxels, labels[index]
 

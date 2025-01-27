@@ -99,7 +99,7 @@ class TensorFlowDataLoader:
         chunk_size = max(1, len(all_voxels) // CONFIG.INPUT_TENSOR_CHUNK_SIZE)
         for index, start in enumerate(range(0, len(all_voxels), chunk_size)):
             file_path = f'{CONFIG.INPUT_TENSOR_PATH}{index}_{self.name}_{self.frame_grouping}_{self.target_shape}_{self.bounding_box}_{self.voxel_size}.p'
-            if not os.path.isfile(file_path):
+            if os.path.isfile(file_path):
                 continue
 
             end = start + chunk_size

@@ -22,8 +22,14 @@ train_data_loader.setup()
 train_data_loader_setup_end = time.time()
 print('Finished setup of the train_data_loader after: ', train_data_loader_setup_end - train_data_loader_setup_start)
 
-train_dataset = train_data_loader.get_tf_dataset()
-train_prepared_dataset = train_dataset.shuffle(100).batch(CONFIG.BATCH_SIZE).prefetch(tf.data.AUTOTUNE)
+#train_dataset = train_data_loader.get_tf_dataset()
+train_dataset = (
+    tf.data.TFRecordDataset(train_data_loader.TFRecord_file_paths)
+    .map(train_data_loader.parse_tfrecord, num_parallel_calls=tf.data.experimental.AUTOTUNE)
+    .shuffle(1000)
+    .batch(CONFIG.BATCH_SIZE)
+    .prefetch(tf.data.AUTOTUNE)
+)
 
 num_classes = len(train_data_loader.labels_to_id)
 model = ModelBuilder.AlexNet((num_classes), CONFIG.INPUT_SHAPE, CONFIG.FRAME_GROUPING)
@@ -36,7 +42,7 @@ model_checkpoint_callback = keras.callbacks.ModelCheckpoint(
     save_freq='epoch')
 optimizer = tf.keras.optimizers.Adam(learning_rate=CONFIG.LEARNING_RATE)
 model.compile(optimizer=optimizer, loss=tf.keras.losses.SparseCategoricalCrossentropy(), metrics=['accuracy'])
-history = model.fit(train_prepared_dataset, epochs=CONFIG.EPOCHS, callbacks=[model_checkpoint_callback])
+history = model.fit(train_dataset, epochs=CONFIG.EPOCHS, callbacks=[model_checkpoint_callback])
 model.save("models/direct_regression.keras")
 
 # ----------------------------------

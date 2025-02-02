@@ -16,6 +16,7 @@ class TensorFlowDataLoader:
         self.all_labels = []
         self.labels_to_id = {}
         self.ids_to_label = {}
+        self.TFRecord_file_paths = []
 
 
     def voxelize(self, pcd):
@@ -103,10 +104,10 @@ class TensorFlowDataLoader:
         labels, all_voxels = self.load_data(self.file_path)
         chunk_size = max(1, len(all_voxels) // CONFIG.INPUT_TENSOR_CHUNK_SIZE)
         for index, start in enumerate(range(0, len(all_voxels), chunk_size)):
-            file_path = f'{CONFIG.INPUT_TENSOR_PATH}{index}_{self.name}_{self.frame_grouping}_{self.target_shape}_{self.bounding_box}_{self.voxel_size}.p'
+            file_path = f'{CONFIG.INPUT_TENSOR_PATH}{index}_{self.name}_{self.frame_grouping}_{self.target_shape}_{self.bounding_box}_{self.voxel_size}.tfrecord'
+            self.TFRecord_file_paths.append(file_path)
             if os.path.isfile(file_path):
                 continue
-
             end = start + chunk_size
             chunk_voxels = all_voxels[start:end]
             chunk_labels = labels[start:end]
@@ -114,9 +115,32 @@ class TensorFlowDataLoader:
             print("start create input tensor")
             chunk_input_labels, chunk_input_voxels = self.convert_voxels_to_dense_tensor(chunk_voxels, chunk_labels)
             print("end create input tensor")
-            with open(file_path, 'wb') as path:
-                pickle.dump((chunk_input_labels, chunk_input_voxels), path)
+            
+            self.save_to_tfrecord(file_path, chunk_input_labels, chunk_input_voxels)
 
+    def save_to_tfrecord(self, file_path, labels, voxels):
+        #Saves voxel and label data into a TFRecords file.
+        with tf.io.TFRecordWriter(file_path) as writer:
+            for label, voxel in zip(labels, voxels):
+                example = self.serialize_example(label, voxel)
+                writer.write(example.SerializeToString())
+
+    def serialize_example(self, label, voxel):
+        #Converts a single (label, voxel) pair into a tf.train.Example.
+        feature = {
+            "label": tf.train.Feature(int64_list=tf.train.Int64List(value=[label])),
+            "voxel": tf.train.Feature(bytes_list=tf.train.BytesList(value=[tf.io.serialize_tensor(voxel).numpy()]))
+        }
+        return tf.train.Example(features=tf.train.Features(feature=feature))
+    
+    def parse_tfrecord(example_proto):
+        feature_description = {
+            "label": tf.io.FixedLenFeature([], tf.int64),
+            "voxel": tf.io.FixedLenFeature([], tf.string),
+        }
+        parsed_features = tf.io.parse_single_example(example_proto, feature_description)
+        parsed_features["voxel"] = tf.io.parse_tensor(parsed_features["voxel"], out_type=tf.float32)
+        return parsed_features["label"], parsed_features["voxel"]
 
     def generator(self):
         for index in range(0, CONFIG.INPUT_TENSOR_CHUNK_SIZE):

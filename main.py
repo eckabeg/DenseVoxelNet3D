@@ -25,7 +25,7 @@ print('Finished setup of the train_data_loader after: ', train_data_loader_setup
 train_dataset = train_data_loader.get_tf_dataset()
 train_prepared_dataset = train_dataset.shuffle(100).batch(CONFIG.BATCH_SIZE).prefetch(tf.data.AUTOTUNE)
 
-num_classes = len(train_data_loader.labels_to_idl)
+num_classes = len(train_data_loader.labels_to_id)
 model = ModelBuilder.AlexNet((num_classes), CONFIG.INPUT_SHAPE, CONFIG.FRAME_GROUPING)
 model.summary()
 model_checkpoint_callback = keras.callbacks.ModelCheckpoint(

@@ -13,6 +13,10 @@ class TensorFlowDataLoader:
         self.target_shape = target_shape
         self.voxel_size = voxel_size
         self.frame_grouping = frame_grouping
+        self.all_labels = []
+        self.labels_to_id = {}
+        self.ids_to_label = {}
+
 
     def voxelize(self, pcd):
         pcd = o3d.t.geometry.PointCloud(pcd).to_legacy()
@@ -25,10 +29,11 @@ class TensorFlowDataLoader:
 
         #data = data[:25]  # Limit to the first 25 sequences
         labels = [seq["action"] for seq in data]
-        labels_to_id = {label: idx for idx, label in enumerate(sorted(set(labels)))}
-        #reverse_labels = {idx: label for label, idx in labels_to_id.items()}
+        self.labels_to_id = {label: idx for idx, label in enumerate(sorted(set(labels)))}
+        self.ids_to_label = {idx: label for label, idx in self.labels_to_id.items()}
 
-        labels = [labels_to_id[label] for label in labels]
+        labels = [self.labels_to_id[label] for label in labels]
+        self.all_labels = labels
         point_cloud_sequences = [seq["human_pc"] for seq in data]
 
         all_voxels = []
@@ -131,54 +136,3 @@ class TensorFlowDataLoader:
         dataset = tf.data.Dataset.from_generator(self.generator, output_signature=output_signature)
         dataset = dataset.prefetch(buffer_size=tf.data.AUTOTUNE)
         return dataset
-
-    '''
-    def create_dense_voxel_tensor(self, voxels):
-        grid_shape = (
-            int(np.ceil(self.bounding_box[0] / self.voxel_size)),
-            int(np.ceil(self.bounding_box[1] / self.voxel_size)),
-            int(np.ceil(self.bounding_box[2] / self.voxel_size)),
-        )
-        dense_grid = np.zeros(grid_shape, dtype=np.float32)
-
-        for voxel in voxels:
-            x, y, z = voxel.grid_index
-            dense_grid[x, y, z] = 1  # Mark the voxel as occupied
-
-        return dense_grid
-
-    def pad_or_trim_voxel_grid(self, voxel_grid):
-        padded_grid = np.zeros(self.target_shape, dtype=np.float32)
-
-        min_shape = np.minimum(voxel_grid.shape, self.target_shape)
-        slices = tuple(slice(0, s) for s in min_shape)
-        padded_slices = tuple(slice(0, s) for s in self.target_shape)
-
-        padded_grid[padded_slices] = voxel_grid[slices]
-
-        return padded_grid
-
-    def create_padded_voxel_tensor(self, voxels):
-        dense_voxel_grid = self.create_dense_voxel_tensor(voxels)
-        return self.pad_or_trim_voxel_grid(dense_voxel_grid)
-    
-    def create_padded_voxel_tensor(voxels, bounding_box, target_shape):
-        dense_voxel_grid = create_dense_voxel_tensor(voxels, CONFIG.VOXEL_SIZE, bounding_box)
-        padded_voxel_grid = pad_or_trim_voxel_grid(dense_voxel_grid, target_shape)
-        return tf.convert_to_tensor(padded_voxel_grid, dtype=tf.float32)
-
-
-    def prepare_voxel_tensor(self, voxel_grids):
-        return tf.convert_to_tensor(voxel_grids, dtype=tf.float32)
-
-                    for action_index, action_voxels in enumerate(all_voxels):
-                for i in range(len(action_voxels)):
-                    padded_voxel_tensor = self.create_padded_voxel_tensor(action_voxels[i])
-
-                    if self.frame_grouping > 1:
-                        frame_group = [padded_voxel_tensor] * self.frame_grouping
-                        frame_group_tensor = tf.stack(frame_group, axis=0)
-                        yield frame_group_tensor, labels[action_index]
-                    else:
-                        yield padded_voxel_tensor, labels[action_index]
-'''

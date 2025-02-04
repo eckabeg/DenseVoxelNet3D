@@ -28,7 +28,7 @@ class TensorFlowDataLoader:
         with open(file_path, "rb") as file:
             data = pickle.load(file)
 
-        #data = data[:25]  # Limit to the first 25 sequences
+        #data = data[:1]  # Limit to the first sequence
         labels = [seq["action"] for seq in data]
         self.labels_to_id = {label: idx for idx, label in enumerate(sorted(set(labels)))}
         self.ids_to_label = {idx: label for label, idx in self.labels_to_id.items()}
@@ -122,25 +122,28 @@ class TensorFlowDataLoader:
         #Saves voxel and label data into a TFRecords file.
         with tf.io.TFRecordWriter(file_path) as writer:
             for label, voxel in zip(labels, voxels):
+                voxel = tf.ensure_shape(voxel, [self.frame_grouping, *self.target_shape] if self.frame_grouping > 1 else [*self.target_shape])
                 example = self.serialize_example(label, voxel)
                 writer.write(example.SerializeToString())
 
     def serialize_example(self, label, voxel):
         #Converts a single (label, voxel) pair into a tf.train.Example.
         feature = {
-            "label": tf.train.Feature(int64_list=tf.train.Int64List(value=[label])),
-            "voxel": tf.train.Feature(bytes_list=tf.train.BytesList(value=[tf.io.serialize_tensor(voxel).numpy()]))
+            "voxel": tf.train.Feature(bytes_list=tf.train.BytesList(value=[tf.io.serialize_tensor(voxel).numpy()])),
+            "label": tf.train.Feature(float_list=tf.train.FloatList(value=[label])),
         }
         return tf.train.Example(features=tf.train.Features(feature=feature))
     
-    def parse_tfrecord(example_proto):
+    def parse_tfrecord(self, example_proto):
         feature_description = {
-            "label": tf.io.FixedLenFeature([], tf.int64),
             "voxel": tf.io.FixedLenFeature([], tf.string),
+            "label": tf.io.FixedLenFeature([], tf.float32),
         }
         parsed_features = tf.io.parse_single_example(example_proto, feature_description)
-        parsed_features["voxel"] = tf.io.parse_tensor(parsed_features["voxel"], out_type=tf.float32)
-        return parsed_features["label"], parsed_features["voxel"]
+        labels = parsed_features["label"]
+        voxels = tf.reshape(tf.io.parse_tensor(parsed_features["voxel"], out_type=tf.float32), [CONFIG.FRAME_GROUPING, *CONFIG.INPUT_SHAPE])
+        voxels = tf.ensure_shape(voxels, [self.frame_grouping, *self.target_shape] if self.frame_grouping > 1 else [*self.target_shape])
+        return (voxels, labels)
 
     def generator(self):
         for index in range(0, CONFIG.INPUT_TENSOR_CHUNK_SIZE):
@@ -154,7 +157,7 @@ class TensorFlowDataLoader:
     def get_tf_dataset(self):
         output_signature = (
             tf.TensorSpec(shape=(self.frame_grouping, *self.target_shape) if self.frame_grouping > 1 else self.target_shape, dtype=tf.float32),
-            tf.TensorSpec(shape=(), dtype=tf.int32),
+            tf.TensorSpec(shape=(), dtype=tf.float32),
         )
 
         dataset = tf.data.Dataset.from_generator(self.generator, output_signature=output_signature)

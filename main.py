@@ -6,44 +6,58 @@ import config as CONFIG
 from model_builder import ModelBuilder
 from tensorflow_dataloader import TensorFlowDataLoader
 
+print(keras.__version__)
+
+strategy = tf.distribute.MirroredStrategy()
+print('Number of devices: {}'.format(strategy.num_replicas_in_sync))
+
 # Setup the train data loader and get the train_dataset
-train_data_loader = TensorFlowDataLoader(
-    name='train_dataloader',
-    file_path=CONFIG.TRAINING_DATA_PATH,
-    bounding_box=CONFIG.BOUNDING_BOX,
-    target_shape=CONFIG.INPUT_SHAPE,
-    voxel_size=CONFIG.VOXEL_SIZE,
-    frame_grouping=CONFIG.FRAME_GROUPING,
-)
+with strategy.scope():
+    train_data_loader = TensorFlowDataLoader(
+        name='train_dataloader',
+        file_path=CONFIG.TRAINING_DATA_PATH,
+        bounding_box=CONFIG.BOUNDING_BOX,
+        target_shape=CONFIG.INPUT_SHAPE,
+        voxel_size=CONFIG.VOXEL_SIZE,
+        frame_grouping=CONFIG.FRAME_GROUPING,
+    )
 
-train_data_loader_setup_start = time.time()
-print('Startng the setup of the train_data_loader.')
-train_data_loader.setup()
-train_data_loader_setup_end = time.time()
-print('Finished setup of the train_data_loader after: ', train_data_loader_setup_end - train_data_loader_setup_start)
+    train_data_loader_setup_start = time.time()
+    print('Startng the setup of the train_data_loader.')
+    train_data_loader.setup()
+    train_data_loader_setup_end = time.time()
+    print('Finished setup of the train_data_loader after: ', train_data_loader_setup_end - train_data_loader_setup_start)
 
-#train_dataset = train_data_loader.get_tf_dataset()
-train_dataset = (
-    tf.data.TFRecordDataset(train_data_loader.TFRecord_file_paths)
-    .map(train_data_loader.parse_tfrecord, num_parallel_calls=tf.data.experimental.AUTOTUNE)
-    .shuffle(1000)
-    .batch(CONFIG.BATCH_SIZE)
-    .prefetch(tf.data.AUTOTUNE)
-)
+    #train_dataset = train_data_loader.get_tf_dataset()
 
-num_classes = len(train_data_loader.labels_to_id)
-model = ModelBuilder.AlexNet((num_classes), CONFIG.INPUT_SHAPE, CONFIG.FRAME_GROUPING)
-model.summary()
-model_checkpoint_callback = keras.callbacks.ModelCheckpoint(
-    filepath=CONFIG.CHECKPOINT_PATH,
-    monitor='loss',
-    mode='auto',
-    save_best_only=True,
-    save_freq='epoch')
-optimizer = tf.keras.optimizers.Adam(learning_rate=CONFIG.LEARNING_RATE)
-model.compile(optimizer=optimizer, loss=tf.keras.losses.SparseCategoricalCrossentropy(), metrics=['accuracy'])
-history = model.fit(train_dataset, epochs=CONFIG.EPOCHS, callbacks=[model_checkpoint_callback])
-model.save("models/direct_regression.keras")
+    GLOBAL_BATCH_SIZE = CONFIG.BATCH_SIZE * strategy.num_replicas_in_sync
+    train_dataset = (
+        tf.data.TFRecordDataset(train_data_loader.TFRecord_file_paths)
+        .map(train_data_loader.parse_tfrecord, num_parallel_calls=tf.data.experimental.AUTOTUNE)
+        .shuffle(1000)
+        .batch(GLOBAL_BATCH_SIZE)
+        .prefetch(tf.data.AUTOTUNE)
+    )
+    dist_train_dataset = strategy.experimental_distribute_dataset(train_dataset)
+    for label , element in dist_train_dataset:
+        print(label.shape)
+        print(element.shape)
+
+    optimizer = tf.keras.optimizers.Adam(learning_rate=CONFIG.LEARNING_RATE)
+    model_checkpoint_callback = keras.callbacks.ModelCheckpoint(
+        filepath=CONFIG.CHECKPOINT_PATH,
+        monitor='loss',
+        mode='auto',
+        save_best_only=True,
+        save_freq='epoch'
+    )
+
+    num_classes = len(train_data_loader.labels_to_id)
+    model = ModelBuilder.AlexNet((num_classes), CONFIG.INPUT_SHAPE, CONFIG.FRAME_GROUPING)
+    model.summary()
+    model.compile(optimizer=optimizer, loss=tf.keras.losses.SparseCategoricalCrossentropy(), metrics=['accuracy'])
+    history = model.fit(dist_train_dataset, epochs=CONFIG.EPOCHS, callbacks=[model_checkpoint_callback])
+    model.save("models/direct_regression.keras")
 
 # ----------------------------------
 # Test the trained model

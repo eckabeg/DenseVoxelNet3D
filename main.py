@@ -6,7 +6,6 @@ import config as CONFIG
 from model_builder import ModelBuilder
 from tensorflow_dataloader import TensorFlowDataLoader
 
-print(keras.__version__)
 
 strategy = tf.distribute.MirroredStrategy()
 print('Number of devices: {}'.format(strategy.num_replicas_in_sync))
@@ -39,9 +38,6 @@ with strategy.scope():
         .prefetch(tf.data.AUTOTUNE)
     )
     dist_train_dataset = strategy.experimental_distribute_dataset(train_dataset)
-    for label , element in dist_train_dataset:
-        print(label.shape)
-        print(element.shape)
 
     optimizer = tf.keras.optimizers.Adam(learning_rate=CONFIG.LEARNING_RATE)
     model_checkpoint_callback = keras.callbacks.ModelCheckpoint(

@@ -1,5 +1,6 @@
 from keras import layers, models
 import config as CONFIG
+from residual_connections_builder import ResidualConnectionsBuilder
 
 class ModelBuilder:
     
@@ -27,6 +28,36 @@ class ModelBuilder:
         model.add(layers.Dense(4096, activation='relu'))
         model.add(layers.Dense(4096, activation='relu'))
         model.add(layers.Dense(num_classes, activation='softmax'))
+        return model
+    
+    def ResNet(num_classes, input_shape, grouping):
+        if grouping > 1:
+            input_shape = input_shape + (grouping,)
+
+        inputs = layers.Input(shape=input_shape)
+
+        # Initial Convolution and Pooling
+        x = layers.Conv3D(64, 7, strides=2, padding="same", use_bias=False)(inputs)
+        x = layers.BatchNormalization()(x)
+        x = layers.ReLU()(x)
+        x = layers.MaxPooling3D(3, strides=2, padding='same')(x)
+
+        # Residual Blocks
+        num_blocks = [2, 2, 2, 2]
+        filters = 64
+        for i, num_block in enumerate(num_blocks):
+            for j in range(num_block):
+                stride = 1 if j > 0 else 2
+                x = ResidualConnectionsBuilder.residual_block(x, filters, stride=stride)
+            filters *= 2  # Double filters at each stage
+
+        # Final Layers
+        x = layers.GlobalAveragePooling3D()(x)
+        x = layers.Dense(512, activation='relu')(x)
+        outputs = layers.Dense(num_classes, activation='softmax')(x)
+
+        # Create Model
+        model = models.Model(inputs, outputs)
         return model
 
     def TemporalNet(num_classes, input_shape, grouping):

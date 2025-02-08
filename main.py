@@ -1,3 +1,5 @@
+import wandb
+from wandb.integration.keras import WandbMetricsLogger
 import time
 import numpy as np
 import tensorflow as tf
@@ -6,7 +8,20 @@ import config as CONFIG
 from model_builder import ModelBuilder
 from tensorflow_dataloader import TensorFlowDataLoader
 
-
+wandb.init(
+    project = "activity-regocgnition",
+    config={
+        "learning_rate": CONFIG.LEARNING_RATE,
+        "architecture": "CNN-ResNet18",
+        "dataset": "HmPEAR",
+        "epochs": CONFIG.EPOCHS,
+        "voxel_size": CONFIG.VOXEL_SIZE,
+        "bounding_box": CONFIG.BOUNDING_BOX,
+        "input_shape": CONFIG.INPUT_SHAPE,
+        "frame_grouping": CONFIG.FRAME_GROUPING,
+        "batch_size": CONFIG.BATCH_SIZE
+    }
+)
 
 # Setup the train data loader and get the train_dataset
 train_data_loader = TensorFlowDataLoader(
@@ -48,10 +63,10 @@ lr_scheduler = tf.keras.callbacks.ReduceLROnPlateau(
 )
 
 num_classes = len(train_data_loader.labels_to_id)
-model = ModelBuilder.AlexNet((num_classes), CONFIG.INPUT_SHAPE, CONFIG.FRAME_GROUPING)
+model = ModelBuilder.ResNet((num_classes), CONFIG.INPUT_SHAPE, CONFIG.FRAME_GROUPING)
 model.summary()
 model.compile(optimizer=optimizer, loss=tf.keras.losses.SparseCategoricalCrossentropy(), metrics=['accuracy'])
-history = model.fit(train_dataset, epochs=CONFIG.EPOCHS, callbacks=[model_checkpoint_callback, lr_scheduler])
+history = model.fit(train_dataset, epochs=CONFIG.EPOCHS, callbacks=[model_checkpoint_callback, lr_scheduler, WandbMetricsLogger(log_freq=5)])
 model.save("models/direct_regression.keras")
 
 # ----------------------------------

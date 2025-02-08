@@ -8,6 +8,8 @@ Data
 Output
 models
 /*/__pycache__
+wandb
+.vs
 
 *.pkl
 *.pt

@@ -30,6 +30,7 @@ class TensorFlowDataLoader:
 
         #data = data[:1]  # Limit to the first sequence
         labels = [seq["action"] for seq in data]
+        print(labels)
         self.labels_to_id = {label: idx for idx, label in enumerate(sorted(set(labels)))}
         self.ids_to_label = {idx: label for label, idx in self.labels_to_id.items()}
 
@@ -141,8 +142,8 @@ class TensorFlowDataLoader:
         }
         parsed_features = tf.io.parse_single_example(example_proto, feature_description)
         labels = parsed_features["label"]
-        voxels = tf.reshape(tf.io.parse_tensor(parsed_features["voxel"], out_type=tf.float32), [CONFIG.FRAME_GROUPING, *CONFIG.INPUT_SHAPE])
-        voxels = tf.ensure_shape(voxels, [self.frame_grouping, *self.target_shape] if self.frame_grouping > 1 else [*self.target_shape])
+        voxels = tf.reshape(tf.io.parse_tensor(parsed_features["voxel"], out_type=tf.float32), [*CONFIG.INPUT_SHAPE, CONFIG.FRAME_GROUPING])
+        voxels = tf.ensure_shape(voxels, [*self.target_shape, self.frame_grouping] if self.frame_grouping > 1 else [*self.target_shape])
         return (voxels, labels)
 
     def generator(self):

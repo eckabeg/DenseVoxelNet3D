@@ -5,13 +5,17 @@ class ModelBuilder:
     
     def AlexNet(num_classes, input_shape, grouping):
         if(grouping > 1):
-            input_shape = (grouping,) + input_shape
+            input_shape = input_shape + (grouping,)
         model = models.Sequential()
         model.add(layers.Input(input_shape))
-        model.add(layers.Conv3D(96, (7, 7, 7), (2, 2, 2), padding="same", activation='relu'))  # Input: 3D grid
-        model.add(layers.MaxPooling3D((3, 3, 3), (2, 2, 2), padding="same"))
+        model.add(layers.Conv3D(96, (5, 5, 5), (2, 2, 2), padding="same"))  # Input: 3D grid
+        model.add(layers.BatchNormalization())
+        model.add(layers.Activation('relu'))
+        model.add(layers.MaxPooling3D((3, 3, 3), (2, 2, 2), padding="valid"))
 
-        model.add(layers.Conv3D(256, (5, 5, 5), padding="same", activation='relu'))
+        model.add(layers.Conv3D(256, (3, 3, 3), padding="same"))
+        model.add(layers.BatchNormalization())
+        model.add(layers.Activation('relu'))
         model.add(layers.MaxPooling3D((3, 3, 3), (2, 2, 2), padding="same"))
 
         model.add(layers.Conv3D(384, (3, 3, 3), padding="same", activation='relu'))

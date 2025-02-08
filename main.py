@@ -24,6 +24,8 @@ train_data_loader.setup()
 train_data_loader_setup_end = time.time()
 print('Finished setup of the train_data_loader after: ', train_data_loader_setup_end - train_data_loader_setup_start)
 
+print(train_data_loader.labels_to_id)
+
 #train_dataset = train_data_loader.get_tf_dataset()
 
 train_dataset = (

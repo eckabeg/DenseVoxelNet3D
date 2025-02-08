@@ -30,7 +30,6 @@ class TensorFlowDataLoader:
 
         #data = data[:1]  # Limit to the first sequence
         labels = [seq["action"] for seq in data]
-        print(labels)
         self.labels_to_id = {label: idx for idx, label in enumerate(sorted(set(labels)))}
         self.ids_to_label = {idx: label for label, idx in self.labels_to_id.items()}
 

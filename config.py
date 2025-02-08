@@ -1,4 +1,4 @@
-EPOCHS              = 500
+EPOCHS              = 10
 
 
 VOXEL_SIZE          = 0.05

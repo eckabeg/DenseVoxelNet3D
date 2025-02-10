@@ -51,6 +51,29 @@ train_dataset = (
     .prefetch(tf.data.AUTOTUNE)
 )
 
+valid_data_loader = TensorFlowDataLoader(
+    name='valid_dataloader',
+    file_path=CONFIG.TEST_DATA_PATH,
+    bounding_box=CONFIG.BOUNDING_BOX,
+    target_shape=CONFIG.INPUT_SHAPE,
+    voxel_size=CONFIG.VOXEL_SIZE,
+    frame_grouping=CONFIG.FRAME_GROUPING,
+)
+
+valid_data_loader_setup_start = time.time()
+print('Startng the setup of the valid_data_loader.')
+valid_data_loader.setup()
+valid_data_loader_setup_end = time.time()
+print('Finished setup of the valid_data_loader after: ', valid_data_loader_setup_end - valid_data_loader_setup_start)
+
+vali_dataset = (
+    tf.data.TFRecordDataset(valid_data_loader.TFRecord_file_paths)
+    .map(valid_data_loader.parse_tfrecord, num_parallel_calls=tf.data.experimental.AUTOTUNE)
+    .shuffle(1000)
+    .batch(CONFIG.BATCH_SIZE)
+    .prefetch(tf.data.AUTOTUNE)
+)
+
 optimizer = tf.keras.optimizers.Adam(learning_rate=CONFIG.LEARNING_RATE)
 model_checkpoint_callback = keras.callbacks.ModelCheckpoint(
     filepath=CONFIG.CHECKPOINT_PATH,
@@ -68,7 +91,7 @@ num_classes = len(train_data_loader.labels_to_id)
 model = ModelBuilder.ResNet((num_classes), CONFIG.INPUT_SHAPE, CONFIG.FRAME_GROUPING)
 model.summary()
 model.compile(optimizer=optimizer, loss=tf.keras.losses.SparseCategoricalCrossentropy(), metrics=['accuracy'])
-history = model.fit(train_dataset, epochs=CONFIG.EPOCHS, callbacks=[model_checkpoint_callback, lr_scheduler, WandbMetricsLogger(log_freq=5)])
+history = model.fit(train_dataset, epochs=CONFIG.EPOCHS, validation_data=vali_dataset, callbacks=[model_checkpoint_callback, lr_scheduler, WandbMetricsLogger(log_freq=5)])
 model.save("models/direct_regression.keras")
 
 # ----------------------------------
@@ -88,10 +111,9 @@ test_data_loader.setup()
 test_data_loader_setup_end = time.time()
 print('Finished setup of the test_data_loader after: ', test_data_loader_setup_end - test_data_loader_setup_start)
 
-test_dataset = test_data_loader.get_tf_dataset()
 test_dataset = (
-    tf.data.TFRecordDataset(train_data_loader.TFRecord_file_paths)
-    .map(train_data_loader.parse_tfrecord, num_parallel_calls=tf.data.experimental.AUTOTUNE)
+    tf.data.TFRecordDataset(test_data_loader.TFRecord_file_paths)
+    .map(test_data_loader.parse_tfrecord, num_parallel_calls=tf.data.experimental.AUTOTUNE)
     .shuffle(1000)
     .batch(CONFIG.BATCH_SIZE)
     .prefetch(tf.data.AUTOTUNE)

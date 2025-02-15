@@ -52,11 +52,11 @@ class TensorFlowDataLoader:
         with open(file_path, "rb") as file:
             data = pickle.load(file)
 
-        data = random.choices(data, k=action_amount)
         labels = [seq["action"] for seq in data]
         self.labels_to_id = {label: idx for idx, label in enumerate(sorted(set(labels)))}
         self.ids_to_label = {idx: label for label, idx in self.labels_to_id.items()}
-
+        data = random.choices(data, k=action_amount)
+        labels = [seq["action"] for seq in data]
         labels = [self.labels_to_id[label] for label in labels]
         self.all_labels = labels
         point_cloud_sequences = [seq["human_pc"] for seq in data]

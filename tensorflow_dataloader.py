@@ -4,6 +4,7 @@ import open3d as o3d
 import pickle
 import os
 import config as CONFIG
+import random
 
 class TensorFlowDataLoader:
     def __init__(self, name, file_path, bounding_box, target_shape, voxel_size, frame_grouping=1):
@@ -29,6 +30,29 @@ class TensorFlowDataLoader:
             data = pickle.load(file)
 
         #data = data[:1]  # Limit to the first sequence
+        labels = [seq["action"] for seq in data]
+        self.labels_to_id = {label: idx for idx, label in enumerate(sorted(set(labels)))}
+        self.ids_to_label = {idx: label for label, idx in self.labels_to_id.items()}
+
+        labels = [self.labels_to_id[label] for label in labels]
+        self.all_labels = labels
+        point_cloud_sequences = [seq["human_pc"] for seq in data]
+
+        all_voxels = []
+        for point_cloud_sequence in point_cloud_sequences:
+            sequence_voxels = []
+            for raw_point_cloud in point_cloud_sequence:
+                voxels = self.voxelize(raw_point_cloud)
+                sequence_voxels.append(voxels)
+            all_voxels.append(sequence_voxels)
+
+        return labels, all_voxels
+    
+    def load_random_data(self, file_path, action_amount):
+        with open(file_path, "rb") as file:
+            data = pickle.load(file)
+
+        data = random.choices(data, k=action_amount)
         labels = [seq["action"] for seq in data]
         self.labels_to_id = {label: idx for idx, label in enumerate(sorted(set(labels)))}
         self.ids_to_label = {idx: label for label, idx in self.labels_to_id.items()}

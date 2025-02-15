@@ -19,7 +19,8 @@ wandb.init(
         "bounding_box": CONFIG.BOUNDING_BOX,
         "input_shape": CONFIG.INPUT_SHAPE,
         "frame_grouping": CONFIG.FRAME_GROUPING,
-        "batch_size": CONFIG.BATCH_SIZE
+        "batch_size": CONFIG.BATCH_SIZE,
+        "dropout": CONFIG.DROPOUT,
     }
 )
 

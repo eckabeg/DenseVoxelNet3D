@@ -30,7 +30,7 @@ for i, voxels in enumerate(all_voxels):
 
     # Print results
     print("-------------------")
-    print(f"Ground Truth: {data_loader.ids_to_label[labels[0]]}")
+    print(f"Ground Truth: {data_loader.ids_to_label[labels[i]]}")
     print("Top 5 Predictions:")
     for idx in top_5_indices:
         class_name = data_loader.ids_to_label[idx]

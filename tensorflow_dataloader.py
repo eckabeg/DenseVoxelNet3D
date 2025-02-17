@@ -107,19 +107,12 @@ class TensorFlowDataLoader:
         input_tensor = []
         all_labels = []
         for actionIndex, action in enumerate(all_action_voxels):
-            frame_grouping = []
+            all_labels.append(labels[actionIndex])
+            action_input_tensor = []
             for i in range(0, len(action)):
                 padded_voxel_tensor = self.create_padded_voxel_tensor(action[i])
-                all_labels.append(labels[actionIndex])
-                if(self.frame_grouping <= 1):
-                    input_tensor.append(padded_voxel_tensor)
-                    continue
-
-                frame_grouping.append(padded_voxel_tensor)
-                for y in range(1, self.frame_grouping):
-                    frame_grouping.append(self.create_padded_voxel_tensor(action[i]))
-                input_tensor.append(frame_grouping)
-                frame_grouping = []
+                action_input_tensor.append(padded_voxel_tensor)
+            input_tensor.append(action_input_tensor)
         
         return all_labels, input_tensor
     
@@ -128,7 +121,7 @@ class TensorFlowDataLoader:
         labels, all_voxels = self.load_data(self.file_path)
         chunk_size = max(1, len(all_voxels) // CONFIG.INPUT_TENSOR_CHUNK_SIZE)
         for index, start in enumerate(range(0, len(all_voxels), chunk_size)):
-            file_path = f'{CONFIG.INPUT_TENSOR_PATH}{index}_{self.name}_{self.frame_grouping}_{self.target_shape}_{self.bounding_box}_{self.voxel_size}.tfrecord'
+            file_path = f'{CONFIG.INPUT_TENSOR_PATH}{index}_{chunk_size}_{self.name}_{self.target_shape}_{self.bounding_box}_{self.voxel_size}.tfrecord'
             self.TFRecord_file_paths.append(file_path)
             if os.path.isfile(file_path):
                 continue
@@ -146,7 +139,7 @@ class TensorFlowDataLoader:
         #Saves voxel and label data into a TFRecords file.
         with tf.io.TFRecordWriter(file_path) as writer:
             for label, voxel in zip(labels, voxels):
-                voxel = tf.ensure_shape(voxel, [self.frame_grouping, *self.target_shape] if self.frame_grouping > 1 else [*self.target_shape])
+                voxel = tf.ensure_shape(voxel, [len(voxel), *self.target_shape])
                 example = self.serialize_example(label, voxel)
                 writer.write(example.SerializeToString())
 
@@ -154,20 +147,45 @@ class TensorFlowDataLoader:
         #Converts a single (label, voxel) pair into a tf.train.Example.
         feature = {
             "voxel": tf.train.Feature(bytes_list=tf.train.BytesList(value=[tf.io.serialize_tensor(voxel).numpy()])),
-            "label": tf.train.Feature(float_list=tf.train.FloatList(value=[label])),
+            "label": tf.train.Feature(int64_list=tf.train.Int64List(value=[label])),
+            "actionCount": tf.train.Feature(int64_list=tf.train.Int64List(value=[len(voxel)])),
         }
         return tf.train.Example(features=tf.train.Features(feature=feature))
     
     def parse_tfrecord(self, example_proto):
         feature_description = {
             "voxel": tf.io.FixedLenFeature([], tf.string),
-            "label": tf.io.FixedLenFeature([], tf.float32),
+            "label": tf.io.FixedLenFeature([], tf.int64),
+            "actionCount": tf.io.FixedLenFeature([], tf.int64),
         }
         parsed_features = tf.io.parse_single_example(example_proto, feature_description)
-        labels = parsed_features["label"]
-        voxels = tf.reshape(tf.io.parse_tensor(parsed_features["voxel"], out_type=tf.float32), [*CONFIG.INPUT_SHAPE, CONFIG.FRAME_GROUPING])
-        voxels = tf.ensure_shape(voxels, [*self.target_shape, self.frame_grouping] if self.frame_grouping > 1 else [*self.target_shape])
-        return (voxels, labels)
+        label = parsed_features["label"]
+        actionCount = tf.cast(parsed_features["actionCount"], tf.int32)
+
+        voxels = tf.io.parse_tensor(parsed_features["voxel"], out_type=tf.float32)
+        voxels = tf.reshape(voxels, tf.concat([[actionCount], CONFIG.INPUT_SHAPE], axis=0))
+        voxels = tf.ensure_shape(voxels, [None, *self.target_shape])
+        grouped_voxels, grouped_labels = self.group_voxels(voxels, label)
+        return tf.data.Dataset.from_tensor_slices((grouped_voxels, grouped_labels))
+    
+    def group_voxels(self, voxels, label):
+        grouping = CONFIG.FRAME_GROUPING  # Expected to be 2 based on model input
+        num_frames = tf.shape(voxels)[0]
+
+        # Adjust range to prevent out-of-bounds slicing
+        num_groups = num_frames - grouping + 1
+        indices = tf.range(num_groups)
+
+        def slice_voxels(i):
+            return tf.reshape(voxels[i : i + grouping], (64, 64, 64, grouping))  # Shape: (grouping, 64, 64, 64)
+
+        grouped_voxels = tf.map_fn(slice_voxels, indices, dtype=tf.float32)  # Shape: (num_groups, grouping, 64, 64, 64)
+
+        # Adjust labels to match the number of grouped sequences
+        grouped_labels = tf.broadcast_to(label, [tf.shape(grouped_voxels)[0]])
+
+        return grouped_voxels, grouped_labels
+
 
     def generator(self):
         for index in range(0, CONFIG.INPUT_TENSOR_CHUNK_SIZE):

@@ -47,6 +47,7 @@ print(train_data_loader.labels_to_id)
 train_dataset = (
     tf.data.TFRecordDataset(train_data_loader.TFRecord_file_paths)
     .map(train_data_loader.parse_tfrecord, num_parallel_calls=tf.data.experimental.AUTOTUNE)
+    .flat_map(lambda x: x)
     .shuffle(1000)
     .batch(CONFIG.BATCH_SIZE, drop_remainder=True)
     .prefetch(tf.data.AUTOTUNE)
@@ -70,6 +71,7 @@ print('Finished setup of the valid_data_loader after: ', valid_data_loader_setup
 vali_dataset = (
     tf.data.TFRecordDataset(valid_data_loader.TFRecord_file_paths)
     .map(valid_data_loader.parse_tfrecord, num_parallel_calls=tf.data.experimental.AUTOTUNE)
+    .flat_map(lambda x: x)
     .shuffle(1000)
     .batch(CONFIG.BATCH_SIZE)
     .prefetch(tf.data.AUTOTUNE)
@@ -115,6 +117,7 @@ print('Finished setup of the test_data_loader after: ', test_data_loader_setup_e
 test_dataset = (
     tf.data.TFRecordDataset(test_data_loader.TFRecord_file_paths)
     .map(test_data_loader.parse_tfrecord, num_parallel_calls=tf.data.experimental.AUTOTUNE)
+    .flat_map(lambda x: x)
     .shuffle(1000)
     .batch(CONFIG.BATCH_SIZE)
     .prefetch(tf.data.AUTOTUNE)

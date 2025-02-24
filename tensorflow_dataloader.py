@@ -117,8 +117,7 @@ class TensorFlowDataLoader:
             # Store in 4D voxel grid (x, y, z, t)
             for v in voxel_indices:
                 action_input_tensor[frame_idx, v[0], v[1], v[2]] = 1  # Preserve all frames
-
-        return action_input_tensor
+        return tf.convert_to_tensor(action_input_tensor, dtype=tf.float32)
 
     def create_padded_voxel_tensor(self, voxels):
         dense_voxel_grid = self.create_dense_voxel_tensor(voxels, self.voxel_size, self.bounding_box)

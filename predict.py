@@ -21,7 +21,7 @@ vali_dataset = (
     tf.data.TFRecordDataset(valid_data_loader.TFRecord_file_paths)
     .map(valid_data_loader.parse_tfrecord, num_parallel_calls=tf.data.experimental.AUTOTUNE)
     .flat_map(lambda x: x)
-    .shuffle(1000)
+    .shuffle(15000)
     .batch(CONFIG.BATCH_SIZE)
     .prefetch(tf.data.AUTOTUNE)
 )
@@ -29,14 +29,14 @@ vali_dataset = (
 index = 0
 for batch_voxels, batch_labels in vali_dataset:
     for voxels, label in zip(batch_voxels, batch_labels):
-        voxels = np.expand_dims(batch_voxels[index], axis=0)
+        voxels = np.expand_dims(voxels, axis=0)
         probabilities = model(voxels).numpy().flatten()  # Convert to NumPy and flatten
 
-        # Get top 5 class indices
-        top_5_indices = np.argsort(probabilities)[::-1][:5]  # Sort in descending order
+        # Get the top 5 class indices for this sample
+        top_5_indices = np.argsort(probabilities)[::-1][:5]
+        
         # Print results
         print("-------------------")
-        print(label.numpy())
         print(f"Ground Truth: {valid_data_loader.ids_to_label[label.numpy()]}")
         print("Top 5 Predictions:")
         for idx in top_5_indices:
@@ -44,4 +44,5 @@ for batch_voxels, batch_labels in vali_dataset:
             confidence = probabilities[idx] * 100
             print(f"  {class_name}: {confidence:.2f}%")
         index += 1
-    break
+    if(index > 3):
+        break

@@ -8,6 +8,7 @@ import config as CONFIG
 from model_builder import ModelBuilder
 from tensorflow_dataloader import TensorFlowDataLoader
 
+
 wandb.init(
     project = "activity-regocgnition",
     config={
@@ -48,7 +49,7 @@ train_dataset = (
     tf.data.TFRecordDataset(train_data_loader.TFRecord_file_paths)
     .map(train_data_loader.parse_tfrecord, num_parallel_calls=tf.data.experimental.AUTOTUNE)
     .flat_map(lambda x: x)
-    .shuffle(1000)
+    .shuffle(150000)
     .batch(CONFIG.BATCH_SIZE, drop_remainder=True)
     .prefetch(tf.data.AUTOTUNE)
 )
@@ -72,7 +73,7 @@ vali_dataset = (
     tf.data.TFRecordDataset(valid_data_loader.TFRecord_file_paths)
     .map(valid_data_loader.parse_tfrecord, num_parallel_calls=tf.data.experimental.AUTOTUNE)
     .flat_map(lambda x: x)
-    .shuffle(1000)
+    .shuffle(20000)
     .batch(CONFIG.BATCH_SIZE)
     .prefetch(tf.data.AUTOTUNE)
 )
@@ -80,7 +81,7 @@ vali_dataset = (
 optimizer = tf.keras.optimizers.Adam(learning_rate=CONFIG.LEARNING_RATE)
 model_checkpoint_callback = keras.callbacks.ModelCheckpoint(
     filepath=CONFIG.CHECKPOINT_PATH,
-    monitor='loss',
+    monitor='val_loss',
     mode='auto',
     save_best_only=True,
     save_freq='epoch'
@@ -91,7 +92,7 @@ lr_scheduler = tf.keras.callbacks.ReduceLROnPlateau(
 )
 
 num_classes = len(train_data_loader.labels_to_id)
-model = ModelBuilder.ResNet((num_classes), CONFIG.INPUT_SHAPE, CONFIG.FRAME_GROUPING)
+model = ModelBuilder.OwnNet((num_classes), CONFIG.INPUT_SHAPE, CONFIG.FRAME_GROUPING)
 model.summary()
 model.compile(optimizer=optimizer, loss=tf.keras.losses.SparseCategoricalCrossentropy(), metrics=['accuracy'])
 history = model.fit(train_dataset, epochs=CONFIG.EPOCHS, validation_data=vali_dataset, callbacks=[model_checkpoint_callback, lr_scheduler, WandbMetricsLogger(log_freq=5)])
@@ -118,7 +119,7 @@ test_dataset = (
     tf.data.TFRecordDataset(test_data_loader.TFRecord_file_paths)
     .map(test_data_loader.parse_tfrecord, num_parallel_calls=tf.data.experimental.AUTOTUNE)
     .flat_map(lambda x: x)
-    .shuffle(1000)
+    .shuffle(20000)
     .batch(CONFIG.BATCH_SIZE)
     .prefetch(tf.data.AUTOTUNE)
 )

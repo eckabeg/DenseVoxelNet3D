@@ -15,14 +15,24 @@ train_data_loader = TensorFlowDataLoader(
 
 
 labels, all_voxels = train_data_loader.load_data(CONFIG.TEST_DATA_PATH)
-tensor = train_data_loader.create_padded_voxel_tensor(all_voxels[34][7])
-print(train_data_loader.ids_to_label[labels[34]])
+print(train_data_loader.ids_to_label)
+for index, label in enumerate(labels):
+    if train_data_loader.ids_to_label[label] == 'close_an_unbrella':
+        break
 
-x, y, z = np.where(tensor == 1)
-points = np.vstack((x, y, z)).T
 
-# Convert to Open3D point cloud
-pcd = o3d.t.geometry.PointCloud(points)
+tensors = train_data_loader.normalize_and_create_padded_voxel_tensors(all_voxels[index])
+print(train_data_loader.ids_to_label[labels[index]])
+print(len(all_voxels[index]))
+print(len(tensors))
+pcds = []
+for result in tensors:
+    x, y, z = np.where(result == 1)
+    points = np.vstack((x, y, z)).T
+
+    # Convert to Open3D point cloud
+    pcd = o3d.t.geometry.PointCloud(points)
+    pcds.append(pcd.to_legacy())
 
 # Visualize
-o3d.visualization.draw_geometries([pcd.to_legacy()])
+o3d.visualization.draw_geometries(pcds)

@@ -38,15 +38,7 @@ class TensorFlowDataLoader:
         self.all_labels = labels
         point_cloud_sequences = [seq["human_pc"] for seq in data]
 
-        all_voxels = []
-        for point_cloud_sequence in point_cloud_sequences:
-            sequence_voxels = []
-            for raw_point_cloud in point_cloud_sequence:
-                voxels = self.voxelize(raw_point_cloud)
-                sequence_voxels.append(voxels)
-            all_voxels.append(sequence_voxels)
-
-        return labels, all_voxels
+        return labels, point_cloud_sequences
     
     def load_random_data(self, file_path, action_amount):
         with open(file_path, "rb") as file:
@@ -97,6 +89,36 @@ class TensorFlowDataLoader:
         padded_grid[padded_slices] = voxel_grid[slices]
 
         return padded_grid
+    
+    def normalize_and_create_padded_voxel_tensors(self, action):
+        num_frames = len(action)
+        action_input_tensor = np.zeros((num_frames, *self.target_shape), dtype=np.uint8)
+
+        # Compute global min and max across all frames
+        all_points = np.vstack(action)  # Stack all frames together
+        global_min = np.min(all_points, axis=0)
+        global_max = np.max(all_points, axis=0)
+
+        # Compute global scale factor
+        scale_factors = np.array(self.target_shape) / (global_max - global_min)
+        scale = np.min(scale_factors)  # Uniform scaling
+
+        for frame_idx, frame in enumerate(action):
+            # Translate all frames using the same global min
+            translated = frame - global_min
+
+            # Apply global scale
+            normalized = translated * scale
+
+            # Round to integer voxel indices
+            voxel_indices = np.floor(normalized).astype(int)
+            voxel_indices = np.clip(voxel_indices, 0, np.array(self.target_shape) - 1)
+
+            # Store in 4D voxel grid (x, y, z, t)
+            for v in voxel_indices:
+                action_input_tensor[frame_idx, v[0], v[1], v[2]] = 1  # Preserve all frames
+
+        return action_input_tensor
 
     def create_padded_voxel_tensor(self, voxels):
         dense_voxel_grid = self.create_dense_voxel_tensor(voxels, self.voxel_size, self.bounding_box)
@@ -108,10 +130,7 @@ class TensorFlowDataLoader:
         all_labels = []
         for actionIndex, action in enumerate(all_action_voxels):
             all_labels.append(labels[actionIndex])
-            action_input_tensor = []
-            for i in range(0, len(action)):
-                padded_voxel_tensor = self.create_padded_voxel_tensor(action[i])
-                action_input_tensor.append(padded_voxel_tensor)
+            action_input_tensor = self.normalize_and_create_padded_voxel_tensors(action)
             input_tensor.append(action_input_tensor)
         
         return all_labels, input_tensor

@@ -1,4 +1,4 @@
-from keras import layers, models
+from keras import layers, models, regularizers
 import config as CONFIG
 from residual_connections_builder import ResidualConnectionsBuilder
 
@@ -9,14 +9,15 @@ class ModelBuilder:
             input_shape = input_shape + (grouping,)
         model = models.Sequential()
         model.add(layers.Input(input_shape))
-        model.add(layers.Conv3D(16, (5, 5, 5), strides=(1, 1, 1), padding="same", activation='relu'))  # Input: 3D grid
-        model.add(layers.BatchNormalization())
-
-        model.add(layers.Conv3D(32, (3, 3, 3), padding="same", activation='relu'))
+        model.add(layers.Conv3D(16, (5, 5, 5), strides=(1, 1, 1), padding="same", activation='relu', kernel_regularizer=regularizers.l2(CONFIG.CONV_REGULARIZERS)))  # Input: 3D grid
         model.add(layers.BatchNormalization())
         model.add(layers.MaxPooling3D((2, 2, 2)))
 
-        model.add(layers.Conv3D(64, (3, 3, 3), strides=(2, 2, 2), padding="same", activation='relu'))
+        model.add(layers.Conv3D(32, (3, 3, 3), padding="same", activation='relu', kernel_regularizer=regularizers.l2(CONFIG.CONV_REGULARIZERS)))
+        model.add(layers.BatchNormalization())
+        model.add(layers.MaxPooling3D((2, 2, 2)))
+
+        model.add(layers.Conv3D(64, (3, 3, 3), strides=(2, 2, 2), padding="same", activation='relu', kernel_regularizer=regularizers.l2(CONFIG.CONV_REGULARIZERS)))
         model.add(layers.BatchNormalization())
         model.add(layers.MaxPooling3D((2, 2, 2)))
 

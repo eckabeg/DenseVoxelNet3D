@@ -14,6 +14,7 @@ FRAME_GROUPING      = 5
 
 
 LEARNING_RATE       = 0.0001
+CONV_REGULARIZERS   = 0.0001
 BATCH_SIZE          = 32
 
 TRAINING_DATA_PATH  = 'data/HmPEAR/label/train_act.pkl'

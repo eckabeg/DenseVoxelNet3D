@@ -3,8 +3,26 @@ from residual_connections_builder import ResidualConnectionsBuilder
 
 
 class ModelBuilder:
+    """
+    A class for building 3D CNN models.
+    """
 
     def channel_attention(input_tensor, reduction=16):
+        """
+        Applies channel attention mechanism to enhance feature maps.
+
+        Parameters
+        ----------
+        input_tensor : keras.layers.Layer
+            Input feature map tensor.
+        reduction : int, optional
+            Reduction ratio for bottleneck transformation, by default 16.
+
+        Returns
+        -------
+        keras.layers.Layer
+            Output tensor with channel attention applied.
+        """
         filters = input_tensor.shape[-1]
         se = layers.GlobalAveragePooling3D()(input_tensor)
         se = layers.Dense(filters // reduction, activation='relu')(se)
@@ -13,16 +31,57 @@ class ModelBuilder:
         return layers.Multiply()([input_tensor, se])
 
     def spatial_attention(input_tensor):
+        """
+        Applies spatial attention mechanism to emphasize important spatial regions.
+
+        Parameters
+        ----------
+        input_tensor : keras.layers.Layer
+            Input feature map tensor.
+
+        Returns
+        -------
+        keras.layers.Layer
+            Output tensor with spatial attention applied.
+        """
         se = layers.Conv3D(1, (7, 7, 7), padding="same", activation='sigmoid')(input_tensor)
         return layers.Multiply()([input_tensor, se])
 
     def cbam_block(input_tensor):
+        """
+        Applies the Convolutional Block Attention Module (CBAM), 
+        which consists of channel and spatial attention.
+
+        Parameters
+        ----------
+        input_tensor : keras.layers.Layer
+            Input feature map tensor.
+
+        Returns
+        -------
+        keras.layers.Layer
+            Output tensor with CBAM applied.
+        """
         x = ModelBuilder.channel_attention(input_tensor)  # Apply channel attention
         x = ModelBuilder.spatial_attention(x)  # Apply spatial attention
         return x
 
     def se_block(input_tensor, reduction=16):
-        """ Squeeze-and-Excitation block for 3D Convolutional Networks """
+        """
+        Applies the Squeeze-and-Excitation (SE) block to recalibrate channel-wise feature responses.
+
+        Parameters
+        ----------
+        input_tensor : keras.layers.Layer
+            Input feature map tensor.
+        reduction : int, optional
+            Reduction ratio for bottleneck transformation, by default 16.
+
+        Returns
+        -------
+        keras.layers.Layer
+            Output tensor with SE block applied.
+        """
         filters = input_tensor.shape[-1]  # Get the number of channels
         se = layers.GlobalAveragePooling3D()(input_tensor)  # Squeeze: Compute global context
         se = layers.Dense(filters // reduction, activation='relu')(se)  # Excitation: Learn channel weights
@@ -31,6 +90,27 @@ class ModelBuilder:
         return layers.Multiply()([input_tensor, se])  # Scale input features
 
     def ModtionNet(num_classes, input_shape, conv_regularizer, dropout, activation_function):
+        """
+        Builds the MotionNet 3D CNN model for activity recognition.
+
+        Parameters
+        ----------
+        num_classes : int
+            Number of output classes.
+        input_shape : tuple
+            Shape of the input tensor (depth, height, width, channels).
+        conv_regularizer : keras.regularizers.Regularizer
+            Regularization function for convolutional layers.
+        dropout : list of float
+            Dropout rates for fully connected layers.
+        activation_function : str
+            Activation function used in convolutional and dense layers.
+
+        Returns
+        -------
+        keras.Model
+            Compiled 3D CNN model.
+        """
         inputs = layers.Input(input_shape)
 
         x = layers.Conv3D(64, (3, 3, 3), activation=activation_function, kernel_regularizer=conv_regularizer)(inputs)
@@ -55,6 +135,27 @@ class ModelBuilder:
         return model
 
     def AlexNet(num_classes, input_shape, conv_regularizer, dropout, activation_function):
+        """
+        Builds a 3D AlexNet model for activity recognition.
+
+        Parameters
+        ----------
+        num_classes : int
+            Number of output classes.
+        input_shape : tuple
+            Shape of the input tensor (depth, height, width, channels).
+        conv_regularizer : keras.regularizers.Regularizer
+            Regularization function for convolutional layers.
+        dropout : list of float
+            Dropout rates for fully connected layers.
+        activation_function : str
+            Activation function used in convolutional and dense layers.
+
+        Returns
+        -------
+        keras.Model
+            Compiled 3D AlexNet model.
+        """
         model = models.Sequential()
         model.add(layers.Input(input_shape))
         model.add(layers.Conv3D(96, (5, 5, 5), (2, 2, 2), padding="same", kernel_regularizer=conv_regularizer))  # Input: 3D grid
@@ -84,6 +185,27 @@ class ModelBuilder:
         return model
     
     def ResNet(num_classes, input_shape, conv_regularizer, dropout, activation_function):
+        """
+        Builds a 3D ResNet model with residual connections for activity recognition.
+
+        Parameters
+        ----------
+        num_classes : int
+            Number of output classes.
+        input_shape : tuple
+            Shape of the input tensor (depth, height, width, channels).
+        conv_regularizer : keras.regularizers.Regularizer
+            Regularization function for convolutional layers.
+        dropout : list of float
+            Dropout rates for fully connected layers.
+        activation_function : str
+            Activation function used in convolutional and dense layers.
+
+        Returns
+        -------
+        keras.Model
+            Compiled 3D ResNet model.
+        """
         inputs = layers.Input(shape=input_shape)
 
         # Initial Convolution and Pooling

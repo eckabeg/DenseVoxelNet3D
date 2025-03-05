@@ -7,6 +7,24 @@ import time
 
 class TensorFlowDataLoader:
     def __init__(self, name, file_path, target_shape, voxel_size, frame_grouping, shuffle_buffer):
+        """
+        Initializes the TensorFlowDataLoader.
+
+        Parameters
+        ----------
+        name : str
+            Name of the dataset.
+        file_path : str
+            Path to the dataset file.
+        target_shape : tuple
+            Desired shape of the voxel grid.
+        voxel_size : float
+            Size of each voxel.
+        frame_grouping : int
+            Number of frames to group together.
+        shuffle_buffer : int
+            Buffer size for shuffling the dataset.
+        """
         self.name = name
         self.file_path = file_path
         self.bounding_box = (10, 10, 10)
@@ -21,11 +39,17 @@ class TensorFlowDataLoader:
 
     def load_data(self, file_path):
         """
-        Loads point clouds and labels from the HmPEAR dataset file
+        Loads point clouds and labels from the HmPEAR dataset file.
 
         Parameters
         ----------
-        
+        file_path : str
+            Path to the dataset file.
+
+        Returns
+        -------
+        tuple
+            A tuple containing a list of labels and a list of point cloud sequences.
         """
         with open(file_path, "rb") as file:
             data = pickle.load(file)
@@ -73,6 +97,19 @@ class TensorFlowDataLoader:
 #        return tf.convert_to_tensor(padded_voxel_grid, dtype=tf.float32)
     
     def normalize_and_create_padded_voxel_tensors(self, action):
+        """
+        Normalizes and creates padded voxel tensors from point cloud sequences.
+
+        Parameters
+        ----------
+        action : list of np.ndarray
+            List of point cloud frames.
+
+        Returns
+        -------
+        tf.Tensor
+            A tensor representing the padded voxel grid.
+        """
         num_frames = len(action)
         action_input_tensor = np.zeros((num_frames, *self.target_shape), dtype=np.uint8)
 
@@ -101,6 +138,21 @@ class TensorFlowDataLoader:
 
     
     def convert_voxels_to_dense_tensor(self, all_action_voxels, labels):
+        """
+        Converts voxelized point clouds into dense tensors.
+
+        Parameters
+        ----------
+        all_action_voxels : list of lists of np.ndarray
+            List of point cloud sequences.
+        labels : list of int
+            Corresponding labels for each sequence.
+
+        Returns
+        -------
+        tuple
+            A tuple containing processed labels and voxel tensors.
+        """
         input_tensor = []
         all_labels = []
         for actionIndex, action in enumerate(all_action_voxels):
@@ -111,6 +163,9 @@ class TensorFlowDataLoader:
         return all_labels, input_tensor
     
     def setup(self):
+        """
+        Sets up the data processing pipeline and stores processed data in TFRecord format.
+        """
         start_time = time.time()
         print('Startng setup of ', self.name)
 

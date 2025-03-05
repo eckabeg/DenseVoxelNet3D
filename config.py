@@ -81,7 +81,7 @@ MODEL_CALLBACKS = [
         monitor="val_loss", factor=0.5, patience=5  # Reduce learning rate when validation loss plateaus
     ),
     WandbMetricsLogger(log_freq=5)  # Log metrics to Weights & Biases every 5 epochs
-
+]
 
 # MotionNet
 ACTIVATION_FUNCTION = 'relu'

@@ -1,5 +1,4 @@
-from keras import layers, models, regularizers, Model
-import config as CONFIG
+from keras import layers, models, Model
 from residual_connections_builder import ResidualConnectionsBuilder
 
 
@@ -31,71 +30,64 @@ class ModelBuilder:
         se = layers.Reshape((1, 1, 1, filters))(se)  # Reshape to apply channel-wise
         return layers.Multiply()([input_tensor, se])  # Scale input features
 
-    def OwnNet(num_classes, input_shape, grouping):
-        if(grouping > 1):
-            input_shape = input_shape + (grouping,)
+    def ModtionNet(num_classes, input_shape, conv_regularizer, dropout, activation_function):
         inputs = layers.Input(input_shape)
 
-        x = layers.Conv3D(64, (3, 3, 3), activation='relu', kernel_regularizer=regularizers.l2(CONFIG.CONV_REGULARIZERS))(inputs)
+        x = layers.Conv3D(64, (3, 3, 3), activation=activation_function, kernel_regularizer=conv_regularizer)(inputs)
         x = layers.BatchNormalization()(x)
 
-        x = layers.Conv3D(128, (3, 3, 3), activation='relu', kernel_regularizer=regularizers.l2(CONFIG.CONV_REGULARIZERS))(x)
+        x = layers.Conv3D(128, (3, 3, 3), activation=activation_function, kernel_regularizer=conv_regularizer)(x)
         x = layers.BatchNormalization()(x)
         x = layers.MaxPooling3D((2, 2, 2))(x)
 
-        x = layers.Conv3D(256, (3, 3, 3), activation='relu', kernel_regularizer=regularizers.l2(CONFIG.CONV_REGULARIZERS))(x)
+        x = layers.Conv3D(256, (3, 3, 3), activation=activation_function, kernel_regularizer=conv_regularizer)(x)
         x = layers.BatchNormalization()(x)
 
         x = layers.GlobalAveragePooling3D()(x)
-        x = layers.Dropout(0.4)(x)
-        x = layers.Dense(512, activation='relu')(x)
-        x = layers.Dropout(0.4)(x)
-        x = layers.Dense(256, activation='relu')(x)
-        x = layers.Dropout(0.3)(x)
+        x = layers.Dropout(dropout[0])(x)
+        x = layers.Dense(512, activation=activation_function)(x)
+        x = layers.Dropout(dropout[1])(x)
+        x = layers.Dense(256, activation=activation_function)(x)
+        x = layers.Dropout(dropout[2])(x)
         outputs = layers.Dense(num_classes, activation='softmax')(x)
 
-        model = Model(inputs, outputs, name="OwnNet")
+        model = Model(inputs, outputs, name="MotionNet")
         return model
 
-    def AlexNet(num_classes, input_shape, grouping):
-        if(grouping > 1):
-            input_shape = input_shape + (grouping,)
+    def AlexNet(num_classes, input_shape, conv_regularizer, dropout, activation_function):
         model = models.Sequential()
         model.add(layers.Input(input_shape))
-        model.add(layers.Conv3D(96, (5, 5, 5), (2, 2, 2), padding="same", kernel_regularizer=regularizers.l2(CONFIG.CONV_REGULARIZERS)))  # Input: 3D grid
+        model.add(layers.Conv3D(96, (5, 5, 5), (2, 2, 2), padding="same", kernel_regularizer=conv_regularizer))  # Input: 3D grid
         model.add(layers.BatchNormalization())
-        model.add(layers.Activation('relu'))
+        model.add(layers.Activation(activation_function))
         model.add(layers.MaxPooling3D((3, 3, 3), (2, 2, 2), padding="valid"))
 
-        model.add(layers.Conv3D(256, (3, 3, 3), padding="same", kernel_regularizer=regularizers.l2(CONFIG.CONV_REGULARIZERS)))
+        model.add(layers.Conv3D(256, (3, 3, 3), padding="same", kernel_regularizer=conv_regularizer))
         model.add(layers.BatchNormalization())
-        model.add(layers.Activation('relu'))
+        model.add(layers.Activation(activation_function))
         model.add(layers.MaxPooling3D((3, 3, 3), (2, 2, 2), padding="same"))
 
-        model.add(layers.Conv3D(384, (3, 3, 3), padding="same", activation='relu', kernel_regularizer=regularizers.l2(CONFIG.CONV_REGULARIZERS)))
-        model.add(layers.Conv3D(384, (3, 3, 3), padding="same", activation='relu', kernel_regularizer=regularizers.l2(CONFIG.CONV_REGULARIZERS)))
-        model.add(layers.Conv3D(256, (3, 3, 3), padding="same", kernel_regularizer=regularizers.l2(CONFIG.CONV_REGULARIZERS)))
+        model.add(layers.Conv3D(384, (3, 3, 3), padding="same", activation=activation_function, kernel_regularizer=conv_regularizer))
+        model.add(layers.Conv3D(384, (3, 3, 3), padding="same", activation=activation_function, kernel_regularizer=conv_regularizer))
+        model.add(layers.Conv3D(256, (3, 3, 3), padding="same", kernel_regularizer=conv_regularizer))
         model.add(layers.BatchNormalization())
-        model.add(layers.Activation('relu'))
+        model.add(layers.Activation(activation_function))
         model.add(layers.MaxPooling3D((3, 3, 3), (2, 2, 2), padding="same"))
 
         model.add(layers.Flatten())
-        model.add(layers.Dropout(0.4))
-        model.add(layers.Dense(2048, activation='relu'))
-        model.add(layers.Dropout(0.4))
-        model.add(layers.Dense(2048, activation='relu'))
-        model.add(layers.Dropout(0.3))
+        model.add(layers.Dropout(dropout[0]))
+        model.add(layers.Dense(2048, activation=activation_function))
+        model.add(layers.Dropout(dropout[1]))
+        model.add(layers.Dense(2048, activation=activation_function))
+        model.add(layers.Dropout(dropout[2]))
         model.add(layers.Dense(num_classes, activation='softmax'))
         return model
     
-    def ResNet(num_classes, input_shape, grouping):
-        if grouping > 1:
-            input_shape = input_shape + (grouping,)
-
+    def ResNet(num_classes, input_shape, conv_regularizer, dropout, activation_function):
         inputs = layers.Input(shape=input_shape)
 
         # Initial Convolution and Pooling
-        x = layers.Conv3D(64, 7, strides=2, padding="same", use_bias=False)(inputs)
+        x = layers.Conv3D(64, 7, strides=2, padding="same", use_bias=False, kernel_regularizer=conv_regularizer)(inputs)
         x = layers.BatchNormalization()(x)
         x = layers.ReLU()(x)
         x = layers.MaxPooling3D(3, strides=2, padding='same')(x)
@@ -106,14 +98,14 @@ class ModelBuilder:
         for i, num_block in enumerate(num_blocks):
             for j in range(num_block):
                 stride = 1 if j > 0 else 2
-                x = ResidualConnectionsBuilder.residual_block(x, filters, CONFIG.CONV_REGULARIZERS, stride=stride)
+                x = ResidualConnectionsBuilder.residual_block(x, filters, conv_regularizer, stride=stride)
             filters *= 2  # Double filters at each stage
 
         # Final Layers
         x = layers.GlobalAveragePooling3D()(x)
-        model.add(layers.Dropout(0.4))
-        x = layers.Dense(512, activation='relu')(x)
-        model.add(layers.Dropout(0.3))
+        x = layers.Dropout(dropout[0])(x)
+        x = layers.Dense(512, activation=activation_function)(x)
+        x = layers.Dropout(dropout[1])(x)
         outputs = layers.Dense(num_classes, activation='softmax')(x)
 
         # Create Model

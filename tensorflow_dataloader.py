@@ -20,10 +20,16 @@ class TensorFlowDataLoader:
         self.shuffle_buffer = shuffle_buffer
 
     def load_data(self, file_path):
+        """
+        Loads point clouds and labels from the HmPEAR dataset file
+
+        Parameters
+        ----------
+        
+        """
         with open(file_path, "rb") as file:
             data = pickle.load(file)
 
-        #data = data[:1]  # Limit to the first sequence
         labels = [seq["action"] for seq in data if seq["action"] in CONFIG.LABELS]
         self.labels_to_id = {label: idx for idx, label in enumerate(sorted(set(labels)))}
         self.ids_to_label = {idx: label for label, idx in self.labels_to_id.items()}
@@ -34,37 +40,37 @@ class TensorFlowDataLoader:
 
         return labels, point_cloud_sequences
 
-    def create_padded_voxel_tensor(self, voxels):
-        dense_voxel_grid = self.create_dense_voxel_tensor(voxels, self.voxel_size, self.bounding_box)
-        padded_voxel_grid = self.pad_or_trim_voxel_grid(dense_voxel_grid, self.target_shape)
-        return tf.convert_to_tensor(padded_voxel_grid, dtype=tf.float32)
-
-    def create_dense_voxel_tensor(self, voxels, voxel_size, bounding_box):
-        # Create an empty 3D grid with the bounding box dimensions
-        grid_shape = (
-            int(np.ceil(bounding_box[0] / voxel_size)),
-            int(np.ceil(bounding_box[1] / voxel_size)),
-            int(np.ceil(bounding_box[2] / voxel_size)),
-        )
-        dense_grid = np.zeros(grid_shape, dtype=np.float32)
-
-        for voxel in voxels:
-            x, y, z = voxel.grid_index
-            dense_grid[x, y, z] = 1  # Mark the voxel as occupied
-        
-        return dense_grid
-
-    def pad_or_trim_voxel_grid(self, voxel_grid, target_shape):
-        padded_grid = np.zeros(target_shape, dtype=np.float32)
-
-        # Find the slicing limits to center the voxel grid
-        min_shape = np.minimum(voxel_grid.shape, target_shape)
-        slices = tuple(slice(0, s) for s in min_shape)
-        padded_slices = tuple(slice(0, s) for s in target_shape)
-
-        padded_grid[padded_slices] = voxel_grid[slices]
-
-        return padded_grid
+#    def create_dense_voxel_tensor(self, voxels, voxel_size, bounding_box):
+#        # Create an empty 3D grid with the bounding box dimensions
+#        grid_shape = (
+#            int(np.ceil(bounding_box[0] / voxel_size)),
+#            int(np.ceil(bounding_box[1] / voxel_size)),
+#            int(np.ceil(bounding_box[2] / voxel_size)),
+#        )
+#        dense_grid = np.zeros(grid_shape, dtype=np.float32)
+#
+#        for voxel in voxels:
+#            x, y, z = voxel.grid_index
+#            dense_grid[x, y, z] = 1  # Mark the voxel as occupied
+#        
+#        return dense_grid
+#
+#    def pad_or_trim_voxel_grid(self, voxel_grid, target_shape):
+#        padded_grid = np.zeros(target_shape, dtype=np.float32)
+#
+#        # Find the slicing limits to center the voxel grid
+#        min_shape = np.minimum(voxel_grid.shape, target_shape)
+#        slices = tuple(slice(0, s) for s in min_shape)
+#        padded_slices = tuple(slice(0, s) for s in target_shape)
+#
+#        padded_grid[padded_slices] = voxel_grid[slices]
+#
+#        return padded_grid
+#    
+#    def create_padded_voxel_tensor(self, voxels):
+#        dense_voxel_grid = self.create_dense_voxel_tensor(voxels, self.voxel_size, self.bounding_box)
+#        padded_voxel_grid = self.pad_or_trim_voxel_grid(dense_voxel_grid, self.target_shape)
+#        return tf.convert_to_tensor(padded_voxel_grid, dtype=tf.float32)
     
     def normalize_and_create_padded_voxel_tensors(self, action):
         num_frames = len(action)

@@ -1,32 +1,60 @@
-from keras import layers, models, regularizers
+from keras import layers, models, regularizers, Model
 import config as CONFIG
 from residual_connections_builder import ResidualConnectionsBuilder
 
+
 class ModelBuilder:
-    
+
+    def channel_attention(input_tensor, reduction=16):
+        filters = input_tensor.shape[-1]
+        se = layers.GlobalAveragePooling3D()(input_tensor)
+        se = layers.Dense(filters // reduction, activation='relu')(se)
+        se = layers.Dense(filters, activation='sigmoid')(se)
+        se = layers.Reshape((1, 1, 1, filters))(se)
+        return layers.Multiply()([input_tensor, se])
+
+    def spatial_attention(input_tensor):
+        se = layers.Conv3D(1, (7, 7, 7), padding="same", activation='sigmoid')(input_tensor)
+        return layers.Multiply()([input_tensor, se])
+
+    def cbam_block(input_tensor):
+        x = ModelBuilder.channel_attention(input_tensor)  # Apply channel attention
+        x = ModelBuilder.spatial_attention(x)  # Apply spatial attention
+        return x
+
+    def se_block(input_tensor, reduction=16):
+        """ Squeeze-and-Excitation block for 3D Convolutional Networks """
+        filters = input_tensor.shape[-1]  # Get the number of channels
+        se = layers.GlobalAveragePooling3D()(input_tensor)  # Squeeze: Compute global context
+        se = layers.Dense(filters // reduction, activation='relu')(se)  # Excitation: Learn channel weights
+        se = layers.Dense(filters, activation='sigmoid')(se)
+        se = layers.Reshape((1, 1, 1, filters))(se)  # Reshape to apply channel-wise
+        return layers.Multiply()([input_tensor, se])  # Scale input features
+
     def OwnNet(num_classes, input_shape, grouping):
         if(grouping > 1):
             input_shape = input_shape + (grouping,)
-        model = models.Sequential()
-        model.add(layers.Input(input_shape))
-        model.add(layers.Conv3D(16, (5, 5, 5), strides=(1, 1, 1), padding="same", activation='relu', kernel_regularizer=regularizers.l2(CONFIG.CONV_REGULARIZERS)))  # Input: 3D grid
-        model.add(layers.BatchNormalization())
-        model.add(layers.MaxPooling3D((2, 2, 2)))
+        inputs = layers.Input(input_shape)
 
-        model.add(layers.Conv3D(32, (3, 3, 3), padding="same", activation='relu', kernel_regularizer=regularizers.l2(CONFIG.CONV_REGULARIZERS)))
-        model.add(layers.BatchNormalization())
-        model.add(layers.MaxPooling3D((2, 2, 2)))
+        x = layers.Conv3D(64, (3, 3, 3), activation='relu', kernel_regularizer=regularizers.l2(CONFIG.CONV_REGULARIZERS))(inputs)
+        x = layers.BatchNormalization()(x)
 
-        model.add(layers.Conv3D(64, (3, 3, 3), strides=(2, 2, 2), padding="same", activation='relu', kernel_regularizer=regularizers.l2(CONFIG.CONV_REGULARIZERS)))
-        model.add(layers.BatchNormalization())
-        model.add(layers.MaxPooling3D((2, 2, 2)))
+        x = layers.Conv3D(128, (3, 3, 3), activation='relu', kernel_regularizer=regularizers.l2(CONFIG.CONV_REGULARIZERS))(x)
+        x = layers.BatchNormalization()(x)
+        x = layers.MaxPooling3D((2, 2, 2))(x)
 
-        model.add(layers.Flatten())
-        model.add(layers.Dense(512, activation='relu'))
-        model.add(layers.Dropout(0.5))
-        model.add(layers.Dense(256, activation='relu'))
-        model.add(layers.Dropout(0.3))
-        model.add(layers.Dense(num_classes, activation='softmax'))
+        x = layers.Conv3D(256, (3, 3, 3), activation='relu', kernel_regularizer=regularizers.l2(CONFIG.CONV_REGULARIZERS))(x)
+        x = layers.BatchNormalization()(x)
+
+        x = layers.GlobalAveragePooling3D()(x)
+        x = layers.Dropout(0.4)(x)
+        x = layers.Dense(512, activation='relu')(x)
+        x = layers.Dropout(0.4)(x)
+        x = layers.Dense(256, activation='relu')(x)
+        x = layers.Dropout(0.3)(x)
+        outputs = layers.Dense(num_classes, activation='softmax')(x)
+
+        model = Model(inputs, outputs, name="OwnNet")
         return model
 
     def AlexNet(num_classes, input_shape, grouping):
@@ -68,7 +96,7 @@ class ModelBuilder:
         x = layers.MaxPooling3D(3, strides=2, padding='same')(x)
 
         # Residual Blocks
-        num_blocks = [2, 2, 2, 2]
+        num_blocks = [2, 2, 2]
         filters = 64
         for i, num_block in enumerate(num_blocks):
             for j in range(num_block):

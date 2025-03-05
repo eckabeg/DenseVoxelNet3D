@@ -4,7 +4,7 @@ import tensorflow as tf
 from tensorflow_dataloader import TensorFlowDataLoader
 import numpy as np
 
-model = keras.models.load_model("models/direct_regression.keras")
+model = keras.models.load_model("models/checkpoints/direct_regression_newnet-v3-small.model.keras")
 
 valid_data_loader = TensorFlowDataLoader(
     name='valid_dataloader',

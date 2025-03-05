@@ -195,7 +195,7 @@ class TensorFlowDataLoader:
         indices = tf.range(num_groups)
 
         def slice_voxels(i):
-            return tf.reshape(voxels[i : i + grouping], (64, 64, 64, grouping))  # Shape: (grouping, 64, 64, 64)
+            return tf.reshape(voxels[i : i + grouping], self.target_shape + (grouping,))  # Shape: (grouping, 64, 64, 64)
 
         grouped_voxels = tf.map_fn(slice_voxels, indices, dtype=tf.float32)  # Shape: (num_groups, grouping, 64, 64, 64)
 

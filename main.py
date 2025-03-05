@@ -13,7 +13,7 @@ wandb.init(
     project = "activity-regocgnition",
     config={
         "learning_rate": CONFIG.LEARNING_RATE,
-        "architecture": "CNN-ResNet18",
+        "architecture": "CNN-OwnNet",
         "dataset": "HmPEAR",
         "epochs": CONFIG.EPOCHS,
         "voxel_size": CONFIG.VOXEL_SIZE,
@@ -49,7 +49,7 @@ train_dataset = (
     tf.data.TFRecordDataset(train_data_loader.TFRecord_file_paths)
     .map(train_data_loader.parse_tfrecord, num_parallel_calls=tf.data.experimental.AUTOTUNE)
     .flat_map(lambda x: x)
-    .shuffle(150000)
+    .shuffle(75000)
     .batch(CONFIG.BATCH_SIZE, drop_remainder=True)
     .prefetch(tf.data.AUTOTUNE)
 )
@@ -73,7 +73,7 @@ vali_dataset = (
     tf.data.TFRecordDataset(valid_data_loader.TFRecord_file_paths)
     .map(valid_data_loader.parse_tfrecord, num_parallel_calls=tf.data.experimental.AUTOTUNE)
     .flat_map(lambda x: x)
-    .shuffle(20000)
+    .shuffle(10000)
     .batch(CONFIG.BATCH_SIZE)
     .prefetch(tf.data.AUTOTUNE)
 )
@@ -88,7 +88,7 @@ model_checkpoint_callback = keras.callbacks.ModelCheckpoint(
 )
 
 lr_scheduler = tf.keras.callbacks.ReduceLROnPlateau(
-    monitor="loss", factor=0.5, patience=3, min_lr=1e-6, verbose=1
+    monitor="val_loss", factor=0.5, patience=5
 )
 
 num_classes = len(train_data_loader.labels_to_id)
@@ -119,7 +119,7 @@ test_dataset = (
     tf.data.TFRecordDataset(test_data_loader.TFRecord_file_paths)
     .map(test_data_loader.parse_tfrecord, num_parallel_calls=tf.data.experimental.AUTOTUNE)
     .flat_map(lambda x: x)
-    .shuffle(20000)
+    .shuffle(10000)
     .batch(CONFIG.BATCH_SIZE)
     .prefetch(tf.data.AUTOTUNE)
 )

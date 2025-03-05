@@ -17,7 +17,6 @@ wandb.init(
         "dataset": "HmPEAR",
         "epochs": CONFIG.EPOCHS,
         "voxel_size": CONFIG.VOXEL_SIZE,
-        "bounding_box": CONFIG.BOUNDING_BOX,
         "input_shape": CONFIG.INPUT_SHAPE,
         "frame_grouping": CONFIG.FRAME_GROUPING,
         "batch_size": CONFIG.BATCH_SIZE,
@@ -29,7 +28,6 @@ wandb.init(
 train_data_loader = TensorFlowDataLoader(
     name='train_dataloader',
     file_path=CONFIG.TRAINING_DATA_PATH,
-    bounding_box=CONFIG.BOUNDING_BOX,
     target_shape=CONFIG.INPUT_SHAPE,
     voxel_size=CONFIG.VOXEL_SIZE,
     frame_grouping=CONFIG.FRAME_GROUPING,
@@ -43,7 +41,6 @@ train_dataset = train_data_loader.get_dataset()
 valid_data_loader = TensorFlowDataLoader(
     name='valid_dataloader',
     file_path=CONFIG.TEST_DATA_PATH,
-    bounding_box=CONFIG.BOUNDING_BOX,
     target_shape=CONFIG.INPUT_SHAPE,
     voxel_size=CONFIG.VOXEL_SIZE,
     frame_grouping=CONFIG.FRAME_GROUPING,
@@ -77,7 +74,6 @@ model.save("models/direct_regression.keras")
 test_data_loader = TensorFlowDataLoader(
     name='valid_dataloader',
     file_path=CONFIG.TEST_DATA_PATH,
-    bounding_box=CONFIG.BOUNDING_BOX,
     target_shape=CONFIG.INPUT_SHAPE,
     voxel_size=CONFIG.VOXEL_SIZE,
     frame_grouping=CONFIG.FRAME_GROUPING,

@@ -6,10 +6,10 @@ import config as CONFIG
 import time
 
 class TensorFlowDataLoader:
-    def __init__(self, name, file_path, bounding_box, target_shape, voxel_size, frame_grouping, shuffle_buffer):
+    def __init__(self, name, file_path, target_shape, voxel_size, frame_grouping, shuffle_buffer):
         self.name = name
         self.file_path = file_path
-        self.bounding_box = bounding_box
+        self.bounding_box = (10, 10, 10)
         self.target_shape = target_shape
         self.voxel_size = voxel_size
         self.frame_grouping = frame_grouping

@@ -1,4 +1,3 @@
-from warnings import deprecated
 import tensorflow as tf
 import numpy as np
 import pickle
@@ -35,13 +34,11 @@ class TensorFlowDataLoader:
 
         return labels, point_cloud_sequences
 
-    @deprecated
     def create_padded_voxel_tensor(self, voxels):
         dense_voxel_grid = self.create_dense_voxel_tensor(voxels, self.voxel_size, self.bounding_box)
         padded_voxel_grid = self.pad_or_trim_voxel_grid(dense_voxel_grid, self.target_shape)
         return tf.convert_to_tensor(padded_voxel_grid, dtype=tf.float32)
 
-    @deprecated
     def create_dense_voxel_tensor(self, voxels, voxel_size, bounding_box):
         # Create an empty 3D grid with the bounding box dimensions
         grid_shape = (
@@ -57,7 +54,6 @@ class TensorFlowDataLoader:
         
         return dense_grid
 
-    @deprecated
     def pad_or_trim_voxel_grid(self, voxel_grid, target_shape):
         padded_grid = np.zeros(target_shape, dtype=np.float32)
 

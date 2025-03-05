@@ -1,13 +1,13 @@
+from warnings import deprecated
 import tensorflow as tf
 import numpy as np
-import open3d as o3d
 import pickle
 import os
 import config as CONFIG
-import random
+import time
 
 class TensorFlowDataLoader:
-    def __init__(self, name, file_path, bounding_box, target_shape, voxel_size, frame_grouping=1):
+    def __init__(self, name, file_path, bounding_box, target_shape, voxel_size, frame_grouping, shuffle_buffer):
         self.name = name
         self.file_path = file_path
         self.bounding_box = bounding_box
@@ -18,12 +18,7 @@ class TensorFlowDataLoader:
         self.labels_to_id = {}
         self.ids_to_label = {}
         self.TFRecord_file_paths = []
-
-
-    def voxelize(self, pcd):
-        pcd = o3d.t.geometry.PointCloud(pcd).to_legacy()
-        voxels = o3d.geometry.VoxelGrid.create_from_point_cloud(pcd, voxel_size=self.voxel_size)
-        return voxels.get_voxels()
+        self.shuffle_buffer = shuffle_buffer
 
     def load_data(self, file_path):
         with open(file_path, "rb") as file:
@@ -39,30 +34,14 @@ class TensorFlowDataLoader:
         point_cloud_sequences = [seq["human_pc"] for seq in data if seq["action"] in CONFIG.LABELS]
 
         return labels, point_cloud_sequences
-    
-    def load_random_data(self, file_path, action_amount):
-        with open(file_path, "rb") as file:
-            data = pickle.load(file)
 
-        labels = [seq["action"] for seq in data]
-        self.labels_to_id = {label: idx for idx, label in enumerate(sorted(set(labels)))}
-        self.ids_to_label = {idx: label for label, idx in self.labels_to_id.items()}
-        data = random.choices(data, k=action_amount)
-        labels = [seq["action"] for seq in data]
-        labels = [self.labels_to_id[label] for label in labels]
-        self.all_labels = labels
-        point_cloud_sequences = [seq["human_pc"] for seq in data]
+    @deprecated
+    def create_padded_voxel_tensor(self, voxels):
+        dense_voxel_grid = self.create_dense_voxel_tensor(voxels, self.voxel_size, self.bounding_box)
+        padded_voxel_grid = self.pad_or_trim_voxel_grid(dense_voxel_grid, self.target_shape)
+        return tf.convert_to_tensor(padded_voxel_grid, dtype=tf.float32)
 
-        all_voxels = []
-        for point_cloud_sequence in point_cloud_sequences:
-            sequence_voxels = []
-            for raw_point_cloud in point_cloud_sequence:
-                voxels = self.voxelize(raw_point_cloud)
-                sequence_voxels.append(voxels)
-            all_voxels.append(sequence_voxels)
-
-        return labels, all_voxels
-
+    @deprecated
     def create_dense_voxel_tensor(self, voxels, voxel_size, bounding_box):
         # Create an empty 3D grid with the bounding box dimensions
         grid_shape = (
@@ -78,6 +57,7 @@ class TensorFlowDataLoader:
         
         return dense_grid
 
+    @deprecated
     def pad_or_trim_voxel_grid(self, voxel_grid, target_shape):
         padded_grid = np.zeros(target_shape, dtype=np.float32)
 
@@ -95,34 +75,28 @@ class TensorFlowDataLoader:
         action_input_tensor = np.zeros((num_frames, *self.target_shape), dtype=np.uint8)
 
         # Compute global min and max across all frames
-        all_points = np.vstack(action)  # Stack all frames together
+        all_points = np.vstack(action)
         global_min = np.min(all_points, axis=0)
         global_max = np.max(all_points, axis=0)
 
-        # Compute global scale factor
+        # Compute global scale factor for each axis
         scale_factors = np.array(self.target_shape) / (global_max - global_min)
-        scale = np.min(scale_factors)  # Uniform scaling
+        scale = np.min(scale_factors)
 
         for frame_idx, frame in enumerate(action):
-            # Translate all frames using the same global min
+            # Translate all frames
             translated = frame - global_min
-
-            # Apply global scale
             normalized = translated * scale
 
             # Round to integer voxel indices
             voxel_indices = np.floor(normalized).astype(int)
             voxel_indices = np.clip(voxel_indices, 0, np.array(self.target_shape) - 1)
 
-            # Store in 4D voxel grid (x, y, z, t)
+            # Convert to dense voxel tensor
             for v in voxel_indices:
                 action_input_tensor[frame_idx, v[0], v[1], v[2]] = 1  # Preserve all frames
         return tf.convert_to_tensor(action_input_tensor, dtype=tf.float32)
 
-    def create_padded_voxel_tensor(self, voxels):
-        dense_voxel_grid = self.create_dense_voxel_tensor(voxels, self.voxel_size, self.bounding_box)
-        padded_voxel_grid = self.pad_or_trim_voxel_grid(dense_voxel_grid, self.target_shape)
-        return tf.convert_to_tensor(padded_voxel_grid, dtype=tf.float32)
     
     def convert_voxels_to_dense_tensor(self, all_action_voxels, labels):
         input_tensor = []
@@ -135,6 +109,9 @@ class TensorFlowDataLoader:
         return all_labels, input_tensor
     
     def setup(self):
+        start_time = time.time()
+        print('Startng setup of ', self.name)
+
         os.makedirs(os.path.dirname(CONFIG.INPUT_TENSOR_PATH), exist_ok=True)
         labels, all_voxels = self.load_data(self.file_path)
         chunk_size = max(1, len(all_voxels) // CONFIG.INPUT_TENSOR_CHUNK_SIZE)
@@ -152,6 +129,9 @@ class TensorFlowDataLoader:
             print("end create input tensor")
             
             self.save_to_tfrecord(file_path, chunk_input_labels, chunk_input_voxels)
+
+        end_time = time.time()
+        print('Finished setup of ' self.name, ' ', end_time - start_time, 's')
 
     def save_to_tfrecord(self, file_path, labels, voxels):
         #Saves voxel and label data into a TFRecords file.
@@ -204,22 +184,12 @@ class TensorFlowDataLoader:
 
         return grouped_voxels, grouped_labels
 
-
-    def generator(self):
-        for index in range(0, CONFIG.INPUT_TENSOR_CHUNK_SIZE):
-            file_path = f'{CONFIG.INPUT_TENSOR_PATH}{index}_{self.name}_{self.frame_grouping}_{self.target_shape}_{self.bounding_box}_{self.voxel_size}.p'
-            with open(file_path, "rb") as file:
-                (chunk_input_labels, chunk_input_voxels) = pickle.load(file)
-            
-            for index, voxels in enumerate(chunk_input_voxels):
-                yield voxels, chunk_input_labels[index]
-
-    def get_tf_dataset(self):
-        output_signature = (
-            tf.TensorSpec(shape=(self.frame_grouping, *self.target_shape) if self.frame_grouping > 1 else self.target_shape, dtype=tf.float32),
-            tf.TensorSpec(shape=(), dtype=tf.float32),
+    def get_dataset(self):
+        return (
+            tf.data.TFRecordDataset(self.TFRecord_file_paths)
+            .map(self.parse_tfrecord, num_parallel_calls=tf.data.experimental.AUTOTUNE)
+            .flat_map(lambda x: x)
+            .shuffle(self.shuffle_buffer)
+            .batch(CONFIG.BATCH_SIZE, drop_remainder=True)
+            .prefetch(tf.data.AUTOTUNE)
         )
-
-        dataset = tf.data.Dataset.from_generator(self.generator, output_signature=output_signature)
-        dataset = dataset.prefetch(buffer_size=tf.data.AUTOTUNE)
-        return dataset

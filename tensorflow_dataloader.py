@@ -131,7 +131,7 @@ class TensorFlowDataLoader:
             self.save_to_tfrecord(file_path, chunk_input_labels, chunk_input_voxels)
 
         end_time = time.time()
-        print('Finished setup of ' self.name, ' ', end_time - start_time, 's')
+        print('Finished setup of ', self.name, ' ', end_time - start_time, 's')
 
     def save_to_tfrecord(self, file_path, labels, voxels):
         #Saves voxel and label data into a TFRecords file.

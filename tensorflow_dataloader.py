@@ -191,6 +191,18 @@ class TensorFlowDataLoader:
         print('Finished setup of ', self.name, ' ', end_time - start_time, 's')
 
     def save_to_tfrecord(self, file_path, labels, voxels):
+        """
+        Saves voxel and label data into a TFRecords file.
+
+        Parameters
+        ----------
+        file_path : str
+            Path to save the TFRecord file.
+        labels : list of int
+            List of labels.
+        voxels : list of tf.Tensor
+            List of voxel tensors.
+        """
         #Saves voxel and label data into a TFRecords file.
         with tf.io.TFRecordWriter(file_path) as writer:
             for label, voxel in zip(labels, voxels):

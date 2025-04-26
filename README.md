@@ -80,3 +80,13 @@ The residual_block method performs the following steps:
 
 The residual_block method effectively builds a building block for residual networks, enabling the creation of deeper and more effective 3D CNNs by leveraging skip connections.
 
+### Visualizer
+The provided script includes two functions designed to visualize point clouds from files.
+
+The first function, display\_folder, processes all files in a specified directory and visualizes the point clouds contained within those files in a single window. It begins by encoding the directory path and iterating through each file within the directory. For each file, it reads the raw point cloud data, reshapes it into a format suitable for visualization, and adds a randomly assigned color. The point clouds are collected into a list, which is then displayed using Open3D's visualization tools.
+
+The second function, display\_cloud, focuses on reading and displaying a single point cloud file. It reads the raw point cloud data from the specified file path, reshapes it, and visualizes the resulting point cloud using Open3D.
+
+### Input Tensor Visualizer
+The TensorFlowDataLoader class is designed to handle the loading, processing, and preparation of point cloud data for use in a TensorFlow-based 3D CNN model. Below is a detailed explanation of the class and its methods:
+

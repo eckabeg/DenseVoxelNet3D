@@ -4,6 +4,8 @@
 LiDAR-based point cloud analysis for Human Activity Recognition (HAR) is increasingly relevant in assistive technologies, particularly for supporting elderly and care-dependent individuals through applications such as fall detection. In this work, we present DenseVoxelNet3D, a compact and efficient 3D convolutional neural network designed for voxelized LiDAR input. The architecture combines a voxelization-based preprocessing pipeline with densely con-
 nected layers to improve feature propagation and mitigate vanishing gradient issues. By integrating global average pooling and dropoutbased regularization, the model achieves strong generalization with minimal overfitting. On the [HmPEAR dataset](http://www.lidarhumanmotion.net/hmpear/), DenseVoxelNet3D outperforms conventional architectures such as AlexNet and ResNet in terms of classification accuracy and computational efficiency.
 
+<img src="DenseVoxelNetArchitecture.png" alt="DenseVoxelNet3D architecture" width="500"/>
+
 ## Classes
 
 ### Config-Class
